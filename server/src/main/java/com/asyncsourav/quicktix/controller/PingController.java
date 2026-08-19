@@ -1,4 +1,6 @@
+
 package com.asyncsourav.quicktix.controller;
+
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +18,7 @@ import java.util.Map;
 @RequestMapping("/api")
 public class PingController {
 
-    
+
     @GetMapping("/ping")
     public ResponseEntity<Map<String, Object>> ping() {
 
