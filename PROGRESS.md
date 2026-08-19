@@ -4,7 +4,9 @@ This log tracks all steps, setup actions, architectural decisions, and progress 
 
 ---
 
-- Initialized the backend Spring Boot project (`quicktix`)
+#### Project initialization
+
+- Initialized the backend Spring Boot project (quicktix)
 - Created local PostgreSQL container setup so no manual local database installation is needed.
 - created application.yml and application-dev.yml
 - wrote Dockerfile and Docker compose file
@@ -13,3 +15,6 @@ This log tracks all steps, setup actions, architectural decisions, and progress 
 - added /health endpoint for liveness and readiness probes
 
 ---
+
+#### Design model for differnt entity
+
