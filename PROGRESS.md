@@ -4,7 +4,7 @@ This log tracks all steps, setup actions, architectural decisions, and progress 
 
 ---
 
-#### Project initialization
+#### Project initialization (day 1)
 
 - Initialized the backend Spring Boot project (quicktix)
 - Created local PostgreSQL container setup so no manual local database installation is needed.
@@ -16,5 +16,8 @@ This log tracks all steps, setup actions, architectural decisions, and progress 
 
 ---
 
-#### Design model for differnt entity
+#### Design model for different entity (day 2)
 
+- designed the user entity with (id, name, email, password, passwordHash, role, createdAt, updatedAt)
+- designed the enum class for the role of the user
+- designed the venue entity having (id, name, address, totalCapacity, organizer, createdAt, updatedAt)
