@@ -31,19 +31,5 @@ public class PingController {
 
         return ResponseEntity.ok(response);
     }
-
-
-    @GetMapping("/health")
-    public ResponseEntity<Map<String, Object>> health() {
-
-        Map<String, Object> response = new HashMap<>();
-
-        response.put("status", "UP");
-        response.put("Message", "All api are live and working");
-        response.put("service", "QuickTix API");
-        response.put("timestamp", LocalDateTime.now().toString());
-
-        return ResponseEntity.ok(response);
-    }
 }
 
