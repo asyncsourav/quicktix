@@ -1,9 +1,9 @@
-# application.yml - Base Configuration
-# This is the main application configuration file.
-# We set 'dev' as the active profile by default so Spring Boot reads application-dev.yml automatically during local development.
 
 spring:
   profiles:
     active: dev
   application:
     name: quicktix
+
+# during deployment: We don't need to make active as prod here. Just (spring.profile.active: PROD) at .env file at deployment
+
