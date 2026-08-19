@@ -1,0 +1,30 @@
+# application-dev.yml - Development Profile Configuration
+# This profile is active during local development.
+# It reads DB connection settings from Environment Variables if present,
+# or falls back to default local Docker PostgreSQL settings (:jdbc:postgresql://localhost:5432/quicktix_db).
+
+server:
+  port: 8080
+
+spring:
+  datasource:
+    # Syntax explanation: ${ENV_VARIABLE_NAME:default_value}
+    # If DB_URL env var exists, Spring uses that. Otherwise, it uses the fallback URL after the colon.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/quicktix_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    # ddl-auto: update tells Hibernate to create or modify table schemas automatically based on Java @Entity classes.
+    hibernate:
+      ddl-auto: update
+    # Prints formatted SQL statements executed by Hibernate to the console (very useful for learning and debugging!)
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
