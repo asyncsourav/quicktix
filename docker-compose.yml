@@ -1,0 +1,24 @@
+# docker-compose.yml
+# This file sets up our PostgreSQL database in a Docker container.
+# No need to install PostgreSQL locally on Windows - Docker manages everything!
+
+services:
+  # The database service definition
+  postgres:
+    image: postgres:16 # Using official PostgreSQL version 16 image
+    container_name: quicktix-postgres # Readable container name
+    restart: unless-stopped # Automatically restart container unless explicitly stopped
+    ports:
+      - "5432:5432" # Maps host port 5432 to container port 5432
+    environment:
+      # Database startup environment parameters
+      POSTGRES_DB: quicktix_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      # Persists data on the host machine so database data survives container restarts/deletions
+      - postgres_data:/var/lib/postgresql/data
+
+# Named Docker volume declaration
+volumes:
+  postgres_data:
