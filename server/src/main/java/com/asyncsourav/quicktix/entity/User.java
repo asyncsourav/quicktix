@@ -18,10 +18,7 @@ import java.time.LocalDateTime;
 
 
 @Entity
-@Table(name = "users",
-        indexes = {
-                @Index(name = "idx_users_email", columnList = "email", unique = true)
-        })
+@Table(name = "users")
 @Getter
 @Setter
 @NoArgsConstructor
