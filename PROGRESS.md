@@ -58,5 +58,7 @@ What does the version and seatStatus does ?? why use both ??
 
 - User repo (UserRepository)
 - Venue repo (VenueRepository)
-- 
+- Evenet Repository
+- Seat Repository
+- Booking Repository
 
