@@ -5,5 +5,5 @@ spring:
   application:
     name: quicktix
 
-# during deployment: We don't need to make active as prod here. Just (spring.profile.active: PROD) at .env file at deployment
+# during deployment: We don't need to make 'profiles' as 'prod' - Just (spring.profile.active: PROD) at .env file at deployment
 

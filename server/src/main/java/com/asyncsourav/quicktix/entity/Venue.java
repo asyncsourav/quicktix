@@ -40,7 +40,6 @@ public class Venue {
 
     @NotNull(message = "Total capacity is required")
     @Min(value = 1, message = "Total capacity must be at least 1")
-    @Max(value = 1000, message = "total capacity cannot exceed more than 1000")
     @Column(name = "total_capacity", nullable = false)
     private Integer totalCapacity;
 

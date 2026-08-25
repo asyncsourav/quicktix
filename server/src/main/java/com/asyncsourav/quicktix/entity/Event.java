@@ -66,9 +66,9 @@ public class Event {
     private BigDecimal basePrice;
 
     @NotNull(message = "Organizer is required")
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "organizer_id", nullable = false)
-    private User organizer;
+    @ManyToOne(fetch = FetchType.LAZY) // LAZY: User data is loaded from database only when event.getOrganizer() is accessed
+    @JoinColumn(name = "organizer_id", nullable = false) // Creates/uses organizer_id in the Event table
+    private User organizer; // connects to the primary key of the user table
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
