@@ -49,4 +49,13 @@ What does the version and seatStatus does ?? why use both ??
                 -> DB version becomes 1                         -> Hibernate throws OptimisticLockException!
                 -> SOURAV GETS THE SEAT!                        -> ALEX'S TRANSACTION ROLLS BACK!
 ```
+- booking entity and booking status enum class completed 
+- booking entity has (id, user (ManyToOne), event, List<Seat> (OneToMany), totalAmount, status(enum), created at, updated at)
+
+---
+
+#### Design the repository class (day 3)
+
+- User repo (UserRepository)
 - 
+
