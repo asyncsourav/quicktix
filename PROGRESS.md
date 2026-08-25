@@ -57,5 +57,6 @@ What does the version and seatStatus does ?? why use both ??
 #### Design the repository class (day 3)
 
 - User repo (UserRepository)
+- Venue repo (VenueRepository)
 - 
 
