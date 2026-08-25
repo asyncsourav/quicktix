@@ -22,4 +22,31 @@ This log tracks all steps, setup actions, architectural decisions, and progress 
 - designed the enum class for the role of the user
 - designed the venue entity having (id, name, address, totalCapacity, organizer, createdAt, updatedAt)
 - designed the Event entity having (id, title, description, venue, start time, category, baseprice, organiserid, createdat)
+- designed the Seat entity having (id, event, seatLable, price, seatstatus, version, booking, createdAt, updatedAt)
+- designed the enum class for the seat status
 
+```
+What does the version and seatStatus does ?? why use both ??
+
+
+                                            [ DATABASE ]
+                                    Seat A1: status = AVAILABLE
+                                                version = 0
+                                                    │
+                            ┌───────────────────────┴───────────────────────┐
+                            ▼                                               ▼
+                    [ SOURAV'S THREAD ]                             [ ALEX'S THREAD ]
+            1. Reads Seat A1 (version = 0)                  1. Reads Seat A1 (version = 0)
+            2. Changes status to 'HELD'                     2. Changes status to 'HELD'
+            3. Sends SQL UPDATE to DB:                      3. Sends SQL UPDATE to DB (1ms later):
+                UPDATE seats                                    UPDATE seats
+                SET status = 'HELD', version = 1                SET status = 'HELD', version = 1
+                WHERE id = 10 AND version = 0;                  WHERE id = 10 AND version = 0;
+                            │                                               │
+                            ▼                                               ▼
+                MATCH! (DB version was 0)                    NO MATCH! (DB version is now 1)
+                -> Rows updated: 1                              -> Rows updated: 0
+                -> DB version becomes 1                         -> Hibernate throws OptimisticLockException!
+                -> SOURAV GETS THE SEAT!                        -> ALEX'S TRANSACTION ROLLS BACK!
+```
+- 
