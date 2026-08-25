@@ -21,5 +21,5 @@ This log tracks all steps, setup actions, architectural decisions, and progress 
 - designed the user entity with (id, name, email, password, passwordHash, role, createdAt, updatedAt)
 - designed the enum class for the role of the user
 - designed the venue entity having (id, name, address, totalCapacity, organizer, createdAt, updatedAt)
-- designed the venue entity having (id, title, description, venue, start time, category, baseprice, organiserid, createdat)
+- designed the Event entity having (id, title, description, venue, start time, category, baseprice, organiserid, createdat)
 
