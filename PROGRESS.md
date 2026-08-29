@@ -64,7 +64,7 @@ What does the version and seatStatus does ?? why use both ??
 
 ---
 
-#### Design DTOs and Mappers (day 4)
+#### Design DTOs and mappers (day 4)
 
 ```
                                 ┌────────────────────────────────────────┐
@@ -84,9 +84,17 @@ What does the version and seatStatus does ?? why use both ??
                                                         - (NO passwordHash! 🔒)
 ```
 
-- Request Dto's (first we are doing every request dto)
+> Request Dto's (first we are doing every request dto)
+
 - Register request (name, email, passsword, role)
 - Login request (email and password)
 - Venue request (name, address, total capacity)
+- booking request (eventId, List<SeatIds>)
 
+> There are many parameters inside the entity class, but we are only using those parameters that could be sent by the users
 
+---
+
+> Response dto's 
+
+- 
