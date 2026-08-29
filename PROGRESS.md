@@ -100,4 +100,4 @@ What does the version and seatStatus does ?? why use both ??
 - user response dto (created a "UserResponse" record that contains id, name, email, role, createdAt)
 - Venue response dto (id, name, address, total capacity, organizer_id, organizer_name, created_at)
 - Event Response dto
-- 
+- Seat Response dto
