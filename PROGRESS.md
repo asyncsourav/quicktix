@@ -85,7 +85,8 @@ What does the version and seatStatus does ?? why use both ??
 ```
 
 - Request Dto's (first we are doing every request dto)
-- Register request (we need name, email, passsword, role)
-- Login request (we only need email and password)
+- Register request (name, email, passsword, role)
+- Login request (email and password)
+- Venue request (name, address, total capacity)
 
 
