@@ -58,7 +58,34 @@ What does the version and seatStatus does ?? why use both ??
 
 - User repo (UserRepository)
 - Venue repo (VenueRepository)
-- Evenet Repository
+- Event Repository
 - Seat Repository
 - Booking Repository
+
+---
+
+#### Design DTOs and Mappers (day 4)
+
+```
+                                ┌────────────────────────────────────────┐
+                                │                 DTOs                   │
+                                └────────────────────────────────────────┘
+                                                │
+                        ┌───────────────────────┴───────────────────────┐
+                        ▼                                               ▼
+                [ 1. Request DTOs ]                             [ 2. Response DTOs ]
+        What the user sends TO the backend             What the backend sends TO the user
+        ------------------------------------           ------------------------------------
+        Example: RegisterRequest                       Example: UserResponse
+        - name                                         - id
+        - email                                        - name
+        - raw password                                 - email
+        - validation rules (@NotBlank, @Email)         - role
+                                                        - (NO passwordHash! 🔒)
+```
+
+- Request Dto's (first we are doing every request dto)
+- Register request (we need name, email, passsword, role)
+- Login request (we only need email and password)
+
 
