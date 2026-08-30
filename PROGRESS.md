@@ -64,7 +64,7 @@ What does the version and seatStatus does ?? why use both ??
 
 ---
 
-#### Design DTOs and mappers (day 4)
+#### Design DTOs and mappers (day 4-5)
 
 ```
                                 ┌────────────────────────────────────────┐
@@ -111,4 +111,15 @@ What does the version and seatStatus does ?? why use both ??
 
 ---
 
-####
+#### Exception Handling (day 6)
+
+- Resource not found exception (if any specific field or resource is not present)
+- Seat unavailable exception
+- Invalid role exception
+- Bad request exception
+- Global exception handler
+- Error Response dto (formatted way of sending the errors in json format)
+
+---
+
+
