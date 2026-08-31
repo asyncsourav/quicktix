@@ -123,5 +123,8 @@ What does the version and seatStatus does ?? why use both ??
 ---
 
 #### Auth v1 — register, login, roles (day 7)
+
 - SecurityConfig now allows without authentication for all requests from (/api/auth/**)
-- 
+- AuthController for login user and register new user
+- AuthService implementing the AuthService.login()
+- AuthService implementing the AuthService.register()
