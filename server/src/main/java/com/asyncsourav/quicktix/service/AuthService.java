@@ -31,8 +31,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
 
 
+    
     /**
-     * Register an user
+     * Registers a new user.
+     *
+     * @param request registration details containing name, email, password, and role
+     * @return the registered user's response
      */
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -80,6 +84,12 @@ public class AuthService {
 
 
 
+    /**
+     * Authenticates a user using their email and password.
+     *
+     * @param request login credentials containing email and password
+     * @return the authenticated user's response
+     */
     @Transactional(readOnly = true)
     public UserResponse login(LoginRequest request) {
 
