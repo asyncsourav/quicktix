@@ -122,4 +122,6 @@ What does the version and seatStatus does ?? why use both ??
 
 ---
 
-
+#### Auth v1 — register, login, roles (day 7)
+- SecurityConfig now allows without authentication for all requests from (/api/auth/**)
+- 
