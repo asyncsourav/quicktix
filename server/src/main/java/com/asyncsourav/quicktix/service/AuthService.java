@@ -5,11 +5,13 @@ package com.asyncsourav.quicktix.service;
 
 import com.asyncsourav.quicktix.dto.request.LoginRequest;
 import com.asyncsourav.quicktix.dto.request.RegisterRequest;
+import com.asyncsourav.quicktix.dto.response.AuthResponse;
 import com.asyncsourav.quicktix.dto.response.UserResponse;
 import com.asyncsourav.quicktix.entity.Role;
 import com.asyncsourav.quicktix.entity.User;
 import com.asyncsourav.quicktix.exception.BadRequestException;
 import com.asyncsourav.quicktix.repository.UserRepository;
+import com.asyncsourav.quicktix.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -20,48 +22,45 @@ import org.springframework.transaction.annotation.Transactional;
 
 
 
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
 
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
 
-    
     /**
-     * Registers a new user.
+     * Registers a new user with BCrypt hashed password and validated role tier.
      *
-     * @param request registration details containing name, email, password, and role
-     * @return the registered user's response
+     * @param request Validated registration parameters
+     * @return Safe UserResponse DTO without password data
      */
     @Transactional
     public UserResponse register(RegisterRequest request) {
 
-        String normalizedEmail = request.email()
+        String normalizedEmail = request
+                .email()
                 .trim()
                 .toLowerCase();
 
         if (userRepository.existsByEmail(normalizedEmail)) {
             log.warn(
-                    "Registration failed: email '{}' is already in use",
+                    "Registration failed: email '{}' is already in use", 
                     normalizedEmail
             );
-
-            throw new BadRequestException(
-                    "Email '" + normalizedEmail + "' is already registered."
-            );
+            throw new BadRequestException("Email '" + normalizedEmail + "' is already registered.");
         }
 
-        String hashedPassword = passwordEncoder.encode(
-                request.password()
-        );
+        String hashedPassword = passwordEncoder
+                .encode(request.password());
 
-        Role assignedRole = request.role() != null
-                ? request.role()
+        Role assignedRole = request.role() != null 
+                ? request.role() 
                 : Role.USER;
 
         User user = User.builder()
@@ -74,8 +73,8 @@ public class AuthService {
         User savedUser = userRepository.save(user);
 
         log.info(
-                "User registered successfully with ID: {} and Role: {}",
-                savedUser.getId(),
+                "User registered successfully with ID: {} and Role: {}", 
+                savedUser.getId(), 
                 savedUser.getRole()
         );
 
@@ -85,19 +84,21 @@ public class AuthService {
 
 
     /**
-     * Authenticates a user using their email and password.
+     * Verifies user login credentials and generates a signed JWT token on success.
      *
-     * @param request login credentials containing email and password
-     * @return the authenticated user's response
+     * @param request validated login credentials
+     * @return authentication response containing the signed JWT token and user profile
      */
     @Transactional(readOnly = true)
-    public UserResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request) {
 
-        String normalizedEmail = request.email()
+        String normalizedEmail = request
+                .email()
                 .trim()
                 .toLowerCase();
 
-        User user = userRepository.findByEmail(normalizedEmail)
+        User user = userRepository
+                .findByEmail(normalizedEmail)
                 .orElseThrow(() -> {
                     log.warn(
                             "Login failed: email '{}' not found",
@@ -123,12 +124,15 @@ public class AuthService {
             );
         }
 
+        String token = jwtUtil.generateToken(user);
+
+        UserResponse userResponse = UserResponse.fromEntity(user);
+
         log.info(
                 "User logged in successfully: ID: {}",
                 user.getId()
         );
 
-        return UserResponse.fromEntity(user);
+        return AuthResponse.of(token, userResponse);
     }
 }
-

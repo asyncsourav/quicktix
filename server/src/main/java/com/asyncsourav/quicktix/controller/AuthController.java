@@ -7,6 +7,7 @@ package com.asyncsourav.quicktix.controller;
 import com.asyncsourav.quicktix.dto.common.ApiResponse;
 import com.asyncsourav.quicktix.dto.request.LoginRequest;
 import com.asyncsourav.quicktix.dto.request.RegisterRequest;
+import com.asyncsourav.quicktix.dto.response.AuthResponse;
 import com.asyncsourav.quicktix.dto.response.UserResponse;
 import com.asyncsourav.quicktix.service.AuthService;
 import jakarta.validation.Valid;
@@ -27,34 +28,44 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
+
     private final AuthService authService;
 
 
+    /**
+     * POST /api/auth/register
+     * Registers a new user and returns their sanitized public profile.
+     */
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<UserResponse>> register(
-                @Valid @RequestBody RegisterRequest request) {
+            @Valid 
+            @RequestBody 
+            RegisterRequest request) {
 
-        UserResponse response = authService.register(request);
+        UserResponse response = authService
+                .register(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(
-                        ApiResponse.success(
-                                "User registered successfully", 
-                                response)
-                );
+                .body(ApiResponse.success("User registered successfully", response));
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<UserResponse>> login(
-                @Valid @RequestBody LoginRequest request) {
 
-        UserResponse response = authService.login(request);
+
+    /**
+     * POST /api/auth/login
+     * Authenticates credentials and returns a signed JWT bearer token.
+     */
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid 
+            @RequestBody 
+            LoginRequest request) {
+
+        AuthResponse response = authService
+                .login(request);
 
         return ResponseEntity
-                .ok(ApiResponse.success(
-                        "Login successful", 
-                        response)
-                );
+                .ok(ApiResponse.success("Login successful", response));
     }
 }
