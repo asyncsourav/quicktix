@@ -38,7 +38,7 @@ public class AuthService {
      * Registers a new user with BCrypt hashed password and validated role tier.
      *
      * @param request Validated registration parameters
-     * @return Safe UserResponse DTO without password data
+     * @return Safe UserResponse DTO without password
      */
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -70,7 +70,8 @@ public class AuthService {
                 .role(assignedRole)
                 .build();
 
-        User savedUser = userRepository.save(user);
+        User savedUser = userRepository
+                .save(user);
 
         log.info(
                 "User registered successfully with ID: {} and Role: {}", 
@@ -78,7 +79,8 @@ public class AuthService {
                 savedUser.getRole()
         );
 
-        return UserResponse.fromEntity(savedUser);
+        return UserResponse
+                .fromEntity(savedUser);
     }
 
 
@@ -104,7 +106,6 @@ public class AuthService {
                             "Login failed: email '{}' not found",
                             normalizedEmail
                     );
-
                     return new BadCredentialsException(
                             "Invalid email or password."
                     );
@@ -118,21 +119,23 @@ public class AuthService {
                     "Login failed: password mismatch for email '{}'",
                     normalizedEmail
             );
-
             throw new BadCredentialsException(
                     "Invalid email or password."
             );
         }
 
-        String token = jwtUtil.generateToken(user);
+        String token = jwtUtil
+                .generateToken(user);
 
-        UserResponse userResponse = UserResponse.fromEntity(user);
+        UserResponse userResponse = UserResponse
+                .fromEntity(user);
 
         log.info(
                 "User logged in successfully: ID: {}",
                 user.getId()
         );
 
-        return AuthResponse.of(token, userResponse);
+        return AuthResponse
+                .of(token, userResponse);
     }
 }
