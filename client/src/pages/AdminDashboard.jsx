@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/client';
-import { ShieldCheck, DollarSign, Ticket, Users, Calendar, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [bookings, setBookings] = useState([]);
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'users'
+  const [activeTab, setActiveTab] = useState('bookings');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -27,7 +27,7 @@ export default function AdminDashboard() {
       setUsers(usersRes.data || []);
       setBookings(bookingsRes.data || []);
     } catch (err) {
-      setError(err.message || 'Failed to load admin dashboard data.');
+      setError(err.message || 'Failed to load admin data.');
     } finally {
       setLoading(false);
     }
@@ -35,109 +35,92 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="container" style={{ padding: '80px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Loading platform telemetry and metrics...
+      <div className="container" style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+        Loading platform stats...
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ padding: '40px 0 80px' }}>
+    <div className="container" style={{ padding: '36px 0 60px' }}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4" style={{ marginBottom: '32px' }}>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4" style={{ marginBottom: '28px' }}>
         <div>
-          <div className="flex items-center gap-2" style={{ marginBottom: '4px' }}>
-            <span className="badge badge-purple">
-              <ShieldCheck size={12} /> System Administrator
-            </span>
-          </div>
-          <h1 style={{ fontSize: '26px', fontWeight: 800 }}>Platform Administration</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-            Real-time platform analytics, global booking records, and user management.
+          <h1 style={{ fontSize: '22px', fontWeight: 700 }}>Admin Dashboard</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px' }}>
+            Platform metrics, booking history, and registered users.
           </p>
         </div>
 
         <button onClick={fetchAdminData} className="btn btn-secondary btn-sm">
-          Refresh Telemetry
+          Refresh
         </button>
       </div>
 
       {error && (
-        <div className="card" style={{ background: 'var(--danger-dim)', borderColor: 'var(--danger)', marginBottom: '24px', padding: '16px' }}>
-          <div className="flex items-center gap-2">
-            <AlertCircle size={18} color="var(--danger)" />
-            <span style={{ fontSize: '14px', color: '#fca5a5' }}>{error}</span>
+        <div className="card" style={{ background: 'var(--danger-dim)', borderColor: 'var(--danger)', marginBottom: '20px', padding: '12px 16px' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--danger)', fontSize: '13px' }}>
+            <AlertCircle size={15} />
+            <span>{error}</span>
           </div>
         </div>
       )}
 
-      {/* Stats Cards Grid */}
+      {/* Stats Grid */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ marginBottom: '36px' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" style={{ marginBottom: '28px' }}>
           <div className="card-stat">
-            <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Gross Revenue</span>
-              <DollarSign size={18} color="var(--success)" />
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 800, color: 'var(--success)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Gross Revenue</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--success)' }}>
               ${Number(stats.totalRevenue).toFixed(2)}
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-              From {stats.confirmedBookings} confirmed bookings
+            <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginTop: '2px' }}>
+              {stats.confirmedBookings} confirmed bookings
             </div>
           </div>
 
           <div className="card-stat">
-            <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Total Bookings</span>
-              <Ticket size={18} color="var(--primary)" />
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 800 }}>{stats.totalBookings}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {stats.cancelledBookings} cancelled / released
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Total Bookings</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-main)' }}>{stats.totalBookings}</div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginTop: '2px' }}>
+              {stats.cancelledBookings} cancelled
             </div>
           </div>
 
           <div className="card-stat">
-            <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Published Events</span>
-              <Calendar size={18} color="var(--warning)" />
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 800 }}>{stats.totalEvents}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Across {stats.totalVenues} registered venues
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Events</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-main)' }}>{stats.totalEvents}</div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginTop: '2px' }}>
+              Across {stats.totalVenues} venues
             </div>
           </div>
 
           <div className="card-stat">
-            <div className="flex items-center justify-between" style={{ marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Total Users</span>
-              <Users size={18} color="var(--accent-purple)" />
-            </div>
-            <div style={{ fontSize: '26px', fontWeight: 800 }}>{stats.totalUsers}</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Customers, Organizers & Admins
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '4px', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Users</div>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-main)' }}>{stats.totalUsers}</div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', marginTop: '2px' }}>
+              Registered accounts
             </div>
           </div>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-2" style={{ borderBottom: '1px solid var(--panel-border)', marginBottom: '24px' }}>
+      <div className="flex items-center gap-2" style={{ borderBottom: '1px solid var(--panel-border)', marginBottom: '20px' }}>
         <button
           onClick={() => setActiveTab('bookings')}
           style={{
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'bookings' ? '2px solid var(--primary)' : '2px solid transparent',
-            color: activeTab === 'bookings' ? 'var(--primary)' : 'var(--text-muted)',
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: 600,
+            color: activeTab === 'bookings' ? 'var(--text-main)' : 'var(--text-muted)',
+            padding: '8px 14px',
+            fontSize: '13.5px',
+            fontWeight: activeTab === 'bookings' ? 600 : 500,
             cursor: 'pointer',
           }}
         >
-          All Platform Bookings ({bookings.length})
+          Bookings ({bookings.length})
         </button>
         <button
           onClick={() => setActiveTab('users')}
@@ -145,45 +128,45 @@ export default function AdminDashboard() {
             background: 'none',
             border: 'none',
             borderBottom: activeTab === 'users' ? '2px solid var(--primary)' : '2px solid transparent',
-            color: activeTab === 'users' ? 'var(--primary)' : 'var(--text-muted)',
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: 600,
+            color: activeTab === 'users' ? 'var(--text-main)' : 'var(--text-muted)',
+            padding: '8px 14px',
+            fontSize: '13.5px',
+            fontWeight: activeTab === 'users' ? 600 : 500,
             cursor: 'pointer',
           }}
         >
-          User Directory ({users.length})
+          Users ({users.length})
         </button>
       </div>
 
-      {/* Tab: Bookings Table */}
+      {/* Bookings Table */}
       {activeTab === 'bookings' && (
         <div className="table-container">
           <table>
             <thead>
               <tr>
-                <th>Booking ID</th>
-                <th>Customer</th>
+                <th>ID</th>
+                <th>User</th>
                 <th>Event</th>
                 <th>Seats</th>
                 <th>Total</th>
                 <th>Status</th>
-                <th>Created At</th>
+                <th>Date</th>
               </tr>
             </thead>
             <tbody>
               {bookings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '32px' }}>
-                    No bookings recorded on the platform yet.
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '24px' }}>
+                    No bookings found.
                   </td>
                 </tr>
               ) : (
                 bookings.map((b) => (
                   <tr key={b.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>#{b.id}</td>
-                    <td>{b.userName || `User ID: ${b.userId}`}</td>
-                    <td style={{ fontWeight: 600 }}>{b.eventTitle}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>#{b.id}</td>
+                    <td>{b.userName || `User #${b.userId}`}</td>
+                    <td>{b.eventTitle}</td>
                     <td>
                       <div className="flex items-center gap-1" style={{ flexWrap: 'wrap' }}>
                         {b.seats?.map((s) => (
@@ -193,16 +176,14 @@ export default function AdminDashboard() {
                         ))}
                       </div>
                     </td>
-                    <td style={{ fontWeight: 700, color: b.status === 'CONFIRMED' ? 'var(--success)' : 'var(--text-dim)' }}>
-                      ${Number(b.totalAmount).toFixed(2)}
-                    </td>
+                    <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>${Number(b.totalAmount).toFixed(2)}</td>
                     <td>
                       <span className={`badge ${b.status === 'CONFIRMED' ? 'badge-success' : 'badge-danger'}`}>
                         {b.status}
                       </span>
                     </td>
-                    <td style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                      {new Date(b.createdAt).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                    <td style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                      {new Date(b.createdAt).toLocaleDateString()}
                     </td>
                   </tr>
                 ))
@@ -212,32 +193,26 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Tab: Users Table */}
+      {/* Users Table */}
       {activeTab === 'users' && (
         <div className="table-container">
           <table>
             <thead>
               <tr>
-                <th>User ID</th>
+                <th>ID</th>
                 <th>Name</th>
-                <th>Email Address</th>
-                <th>Role Tier</th>
-                <th>Registered Date</th>
+                <th>Email</th>
+                <th>Role</th>
               </tr>
             </thead>
             <tbody>
               {users.map((u) => (
                 <tr key={u.id}>
-                  <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>#{u.id}</td>
-                  <td style={{ fontWeight: 600 }}>{u.name}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>#{u.id}</td>
+                  <td style={{ color: 'var(--text-main)', fontWeight: 500 }}>{u.name}</td>
                   <td style={{ color: 'var(--text-muted)' }}>{u.email}</td>
                   <td>
-                    <span className={`badge ${u.role === 'ADMIN' ? 'badge-purple' : u.role === 'ORGANIZER' ? 'badge-primary' : 'badge-muted'}`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Initial Seed'}
+                    <span className="badge badge-muted">{u.role}</span>
                   </td>
                 </tr>
               ))}

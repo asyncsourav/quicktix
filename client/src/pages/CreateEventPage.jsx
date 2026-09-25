@@ -2,23 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { PlusCircle, Building2, Calendar, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 export default function CreateEventPage() {
-  const { user, isOrganizer } = useAuth();
+  const { isOrganizer } = useAuth();
   const navigate = useNavigate();
 
   const [venues, setVenues] = useState([]);
   const [loadingVenues, setLoadingVenues] = useState(true);
 
-  // Venue form state
+  // Venue form modal
   const [showVenueModal, setShowVenueModal] = useState(false);
   const [venueName, setVenueName] = useState('');
   const [venueAddress, setVenueAddress] = useState('');
   const [venueCapacity, setVenueCapacity] = useState(50);
   const [venueLoading, setVenueLoading] = useState(false);
 
-  // Event form state
+  // Event form
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [venueId, setVenueId] = useState('');
@@ -102,74 +102,70 @@ export default function CreateEventPage() {
   };
 
   return (
-    <div className="container" style={{ padding: '40px 0 80px', maxWidth: '700px' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '26px', fontWeight: 800, marginBottom: '6px' }}>Host a New Event</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          Schedule events and automatically generate venue seat layouts with optimistic locking.
+    <div className="container" style={{ padding: '36px 0 60px', maxWidth: '640px' }}>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700 }}>Create New Event</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '13.5px' }}>
+          Publish an event and generate seat layout automatically.
         </p>
       </div>
 
       {error && (
-        <div className="card" style={{ background: 'var(--danger-dim)', borderColor: 'var(--danger)', marginBottom: '24px', padding: '16px' }}>
-          <div className="flex items-center gap-2">
-            <AlertCircle size={18} color="var(--danger)" />
-            <span style={{ fontSize: '14px', color: '#fca5a5' }}>{error}</span>
+        <div className="card" style={{ background: 'var(--danger-dim)', borderColor: 'var(--danger)', marginBottom: '20px', padding: '12px 16px' }}>
+          <div className="flex items-center gap-2" style={{ color: '#f87171', fontSize: '13px' }}>
+            <AlertCircle size={15} />
+            <span>{error}</span>
           </div>
         </div>
       )}
 
-      {/* Main Event Form */}
-      <div className="card" style={{ padding: '32px' }}>
-        <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Event Form */}
+      <div className="card" style={{ padding: '24px' }}>
+        <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
               Event Title
             </label>
             <input
               type="text"
               required
               className="input"
-              placeholder="e.g. Symphony Under The Stars"
+              placeholder="e.g. Symphony Live in Concert"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
               Description
             </label>
             <textarea
               className="input"
               rows={3}
-              placeholder="Describe the experience, performers, or schedule..."
+              placeholder="Event overview, artist lineup, schedule..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </div>
 
-          {/* Venue Selection / Quick Add */}
           <div>
-            <div className="flex items-center justify-between" style={{ marginBottom: '6px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                Venue & Location
+            <div className="flex items-center justify-between" style={{ marginBottom: '4px' }}>
+              <label style={{ fontSize: '12.5px', fontWeight: 500, color: 'var(--text-muted)' }}>
+                Venue Location
               </label>
               <button
                 type="button"
-                onClick={() => setShowVenueModal(!showVenueModal)}
-                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                onClick={() => setShowVenueModal(true)}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}
               >
-                <PlusCircle size={14} /> + New Venue
+                + Add New Venue
               </button>
             </div>
 
             {venues.length === 0 ? (
-              <div style={{ background: 'var(--panel-hover)', padding: '14px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border)', textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
-                No venues registered yet.{' '}
-                <button type="button" onClick={() => setShowVenueModal(true)} style={{ color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                  Create your first venue
-                </button>
+              <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--panel-border)', textAlign: 'center', fontSize: '13px', color: 'var(--text-dim)' }}>
+                No venues created yet. Click "+ Add New Venue" above.
               </div>
             ) : (
               <select
@@ -180,17 +176,16 @@ export default function CreateEventPage() {
               >
                 {venues.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.address}) — Capacity: {v.totalCapacity} seats
+                    {v.name} ({v.address}) — {v.totalCapacity} seats
                   </option>
                 ))}
               </select>
             )}
           </div>
 
-          {/* Category & Price */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
                 Category
               </label>
               <select
@@ -207,7 +202,7 @@ export default function CreateEventPage() {
             </div>
 
             <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
                 Base Price per Seat ($)
               </label>
               <input
@@ -222,10 +217,9 @@ export default function CreateEventPage() {
             </div>
           </div>
 
-          {/* Date & Time */}
           <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
-              Start Date & Time
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
+              Date & Time
             </label>
             <input
               type="datetime-local"
@@ -240,71 +234,66 @@ export default function CreateEventPage() {
             type="submit"
             disabled={eventLoading || venues.length === 0}
             className="btn btn-primary"
-            style={{ padding: '14px', marginTop: '10px' }}
+            style={{ marginTop: '8px' }}
           >
-            <Calendar size={16} />
-            <span>{eventLoading ? 'Generating Seat Layout...' : 'Publish Event & Generate Seats'}</span>
+            {eventLoading ? 'Publishing...' : 'Publish Event'}
           </button>
         </form>
       </div>
 
-      {/* New Venue Modal */}
+      {/* Venue Modal */}
       {showVenueModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '440px', padding: '28px', background: 'var(--panel)', boxShadow: 'var(--shadow-lg)' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Building2 size={18} color="var(--primary)" />
-              <span>Create New Venue</span>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '24px', background: 'var(--panel)' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px' }}>
+              Create Venue
             </h3>
 
-            <form onSubmit={handleCreateVenue} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleCreateVenue} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
                   Venue Name
                 </label>
                 <input
                   type="text"
                   required
                   className="input"
-                  placeholder="e.g. Grand Arena"
+                  placeholder="e.g. City Concert Hall"
                   value={venueName}
                   onChange={(e) => setVenueName(e.target.value)}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>
-                  Address / City
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                  Address
                 </label>
                 <input
                   type="text"
                   required
                   className="input"
-                  placeholder="e.g. 100 Park Ave, New York"
+                  placeholder="e.g. 100 Main St, Chicago"
                   value={venueAddress}
                   onChange={(e) => setVenueAddress(e.target.value)}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-muted)' }}>
-                  Total Seating Capacity
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, marginBottom: '4px', color: 'var(--text-muted)' }}>
+                  Capacity (Seat Count)
                 </label>
                 <input
                   type="number"
                   min="10"
-                  max="1000"
+                  max="500"
                   required
                   className="input"
                   value={venueCapacity}
                   onChange={(e) => setVenueCapacity(e.target.value)}
                 />
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
-                  Auto-generates individual seat rows (A1..A10, B1..B10) on event creation.
-                </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2" style={{ marginTop: '12px' }}>
+              <div className="flex items-center justify-end gap-2" style={{ marginTop: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setShowVenueModal(false)}
@@ -317,7 +306,7 @@ export default function CreateEventPage() {
                   disabled={venueLoading}
                   className="btn btn-primary btn-sm"
                 >
-                  {venueLoading ? 'Creating...' : 'Save Venue'}
+                  {venueLoading ? 'Saving...' : 'Save Venue'}
                 </button>
               </div>
             </form>

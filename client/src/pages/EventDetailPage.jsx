@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { MapPin, Calendar, Check, AlertCircle, ShieldCheck, Ticket, ArrowLeft } from 'lucide-react';
+import { MapPin, Calendar, Check, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export default function EventDetailPage() {
   const { id } = useParams();
@@ -69,13 +69,10 @@ export default function EventDetailPage() {
       });
 
       setSuccessBooking(res.data);
-      // Refresh seat map to show newly booked seats
       await fetchEventAndSeats();
       setSelectedSeatIds([]);
     } catch (err) {
-      // Catch optimistic locking or seat unavailable errors from backend
-      setErrorMessage(err.message || 'Booking collision detected. Please re-select available seats.');
-      // Refresh seats to see what was taken
+      setErrorMessage(err.message || 'Seat unavailable or collision detected. Please choose available seats.');
       await fetchEventAndSeats();
     } finally {
       setBookingLoading(false);
@@ -84,106 +81,100 @@ export default function EventDetailPage() {
 
   if (loading) {
     return (
-      <div className="container" style={{ padding: '80px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
-        Loading interactive seat map...
+      <div className="container" style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+        Loading seat map...
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="container" style={{ padding: '80px 0', textAlign: 'center' }}>
-        <h2 style={{ marginBottom: '16px' }}>Event Not Found</h2>
+      <div className="container" style={{ padding: '60px 0', textAlign: 'center' }}>
+        <h2 style={{ marginBottom: '14px', fontSize: '18px' }}>Event Not Found</h2>
         <button onClick={() => navigate('/')} className="btn btn-secondary">
-          <ArrowLeft size={16} /> Back to Events
+          <ArrowLeft size={15} /> Back to Events
         </button>
       </div>
     );
   }
 
   return (
-    <div className="container" style={{ padding: '36px 0 80px' }}>
-      {/* Back link & Event Header */}
-      <button onClick={() => navigate('/')} className="btn btn-secondary btn-sm" style={{ marginBottom: '20px' }}>
-        <ArrowLeft size={14} /> Back to Events
+    <div className="container" style={{ padding: '30px 0 60px' }}>
+      {/* Back button */}
+      <button onClick={() => navigate('/')} className="btn btn-secondary btn-sm" style={{ marginBottom: '16px' }}>
+        <ArrowLeft size={13} /> Back to Events
       </button>
 
-      <div className="card" style={{ marginBottom: '32px' }}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Event Header Card */}
+      <div className="card" style={{ marginBottom: '24px' }}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
           <div>
-            <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
+            <div className="flex items-center gap-2" style={{ marginBottom: '6px' }}>
               <span className="badge badge-primary">{event.category}</span>
-              <span className="badge badge-success">Optimistic Locking Protected</span>
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '6px' }}>{event.title}</h1>
-            <div className="flex items-center gap-6" style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              <span className="flex items-center gap-1.5"><MapPin size={15} color="var(--text-dim)" /> {event.venueName} · {event.venueAddress}</span>
-              <span className="flex items-center gap-1.5"><Calendar size={15} color="var(--text-dim)" /> {new Date(event.startTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{event.title}</h1>
+            <div className="flex items-center gap-5" style={{ fontSize: '13px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+              <span className="flex items-center gap-1.5"><MapPin size={14} color="var(--text-dim)" /> {event.venueName} · {event.venueAddress}</span>
+              <span className="flex items-center gap-1.5"><Calendar size={14} color="var(--text-dim)" /> {new Date(event.startTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Base Price</div>
-            <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--success)' }}>${Number(event.basePrice).toFixed(2)}</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)' }}>Price per seat</div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>${Number(event.basePrice).toFixed(2)}</div>
           </div>
         </div>
       </div>
 
-      {/* Success Confirmation Modal/Banner */}
+      {/* Success Notification */}
       {successBooking && (
-        <div className="card" style={{ background: 'var(--success-dim)', borderColor: 'var(--success)', marginBottom: '24px', padding: '20px' }}>
-          <div className="flex items-center gap-3">
-            <div style={{ background: 'var(--success)', color: '#fff', padding: '6px', borderRadius: '50%', display: 'flex' }}>
-              <Check size={18} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#a7f3d0' }}>Booking Confirmed Successfully!</h3>
-              <p style={{ fontSize: '13px', color: '#d1fae5' }}>
-                Booking ID: #{successBooking.id} · Total: ${Number(successBooking.totalAmount).toFixed(2)} · Status: {successBooking.status}
-              </p>
+        <div className="card" style={{ background: 'var(--success-dim)', borderColor: 'var(--success)', marginBottom: '20px', padding: '16px' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--success)', fontSize: '14px' }}>Booking Confirmed (ID #{successBooking.id})</div>
+              <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Total: ${Number(successBooking.totalAmount).toFixed(2)}</div>
             </div>
             <button onClick={() => navigate('/my-bookings')} className="btn btn-primary btn-sm">
-              View Ticket
+              View My Bookings
             </button>
           </div>
         </div>
       )}
 
-      {/* Error Banner */}
+      {/* Error Alert */}
       {errorMessage && (
-        <div className="card" style={{ background: 'var(--danger-dim)', borderColor: 'var(--danger)', marginBottom: '24px', padding: '16px 20px' }}>
-          <div className="flex items-center gap-3">
-            <AlertCircle size={20} color="var(--danger)" />
-            <div style={{ fontSize: '14px', color: '#fca5a5' }}>{errorMessage}</div>
+        <div className="card" style={{ background: 'var(--danger-dim)', borderColor: 'var(--danger)', marginBottom: '20px', padding: '14px' }}>
+          <div className="flex items-center gap-2" style={{ color: 'var(--danger)', fontSize: '13px' }}>
+            <AlertCircle size={16} />
+            <span>{errorMessage}</span>
           </div>
         </div>
       )}
 
-      {/* Main Grid: Seat Map + Booking Sidebar */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Seat Map View */}
-        <div className="md:grid-cols-2" style={{ gridColumn: 'span 2' }}>
+      {/* Main Grid: Seat Map + Summary Sidebar */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Seat Map */}
+        <div style={{ gridColumn: 'span 2' }}>
           <div className="seat-map-container">
-            {/* Screen / Stage */}
             <div className="screen-indicator"></div>
             <div className="screen-text">STAGE / SCREEN</div>
 
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-6" style={{ margin: '24px 0 28px', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <div className="flex items-center gap-2">
-                <div className="seat seat-available" style={{ width: '18px', height: '18px', cursor: 'default' }}></div>
+            {/* Legend with clean spacing */}
+            <div className="flex items-center justify-center gap-6" style={{ margin: '20px 0 24px', flexWrap: 'wrap' }}>
+              <div className="flex items-center gap-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div className="seat seat-available" style={{ width: '16px', height: '16px', cursor: 'default' }}></div>
                 <span>Available</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="seat seat-selected" style={{ width: '18px', height: '18px', cursor: 'default' }}></div>
+              <div className="flex items-center gap-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div className="seat seat-selected" style={{ width: '16px', height: '16px', cursor: 'default' }}></div>
                 <span>Selected</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="seat seat-held" style={{ width: '18px', height: '18px', cursor: 'default' }}></div>
+              <div className="flex items-center gap-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div className="seat seat-held" style={{ width: '16px', height: '16px', cursor: 'default' }}></div>
                 <span>Held</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="seat seat-booked" style={{ width: '18px', height: '18px', cursor: 'default' }}></div>
-                <span>Sold</span>
+              <div className="flex items-center gap-2" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <div className="seat seat-booked" style={{ width: '16px', height: '16px', cursor: 'default' }}></div>
+                <span>Booked</span>
               </div>
             </div>
 
@@ -207,9 +198,9 @@ export default function EventDetailPage() {
                     onClick={() => toggleSeatSelection(seat)}
                     disabled={seat.status !== 'AVAILABLE'}
                     className={`seat ${seatClass}`}
-                    title={`Seat ${seat.seatLabel} - $${seat.price} (${seat.status})`}
+                    title={`Seat ${seat.seatLabel} - $${seat.price}`}
                   >
-                    {isSelected ? <Check size={12} /> : seat.seatLabel}
+                    {isSelected ? <Check size={11} /> : seat.seatLabel}
                   </button>
                 );
               })}
@@ -217,37 +208,36 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {/* Booking Sidebar */}
+        {/* Sidebar */}
         <div>
-          <div className="card" style={{ position: 'sticky', top: '90px' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Ticket size={18} color="var(--primary)" />
-              <span>Booking Summary</span>
+          <div className="card" style={{ position: 'sticky', top: '80px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '14px' }}>
+              Booking Summary
             </h3>
 
             {selectedSeats.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
-                Click on available seats on the map to add them to your reservation.
+              <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
+                Select one or more available seats on the map.
               </div>
             ) : (
               <div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                   {selectedSeats.map((seat) => (
-                    <div key={seat.id} className="flex items-center justify-between" style={{ fontSize: '13px', background: 'var(--panel-hover)', padding: '8px 12px', borderRadius: 'var(--radius-sm)' }}>
-                      <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>Seat {seat.seatLabel}</span>
+                    <div key={seat.id} className="flex items-center justify-between" style={{ fontSize: '12.5px', background: 'var(--bg)', padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>Seat {seat.seatLabel}</span>
                       <span style={{ color: 'var(--text-muted)' }}>${Number(seat.price).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ borderTop: '1px solid var(--panel-border)', paddingTop: '16px', marginBottom: '20px' }}>
-                  <div className="flex items-center justify-between" style={{ fontSize: '14px', marginBottom: '6px', color: 'var(--text-muted)' }}>
-                    <span>Seats Selected:</span>
-                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{selectedSeats.length}</span>
+                <div style={{ borderTop: '1px solid var(--panel-border)', paddingTop: '12px', marginBottom: '16px' }}>
+                  <div className="flex items-center justify-between" style={{ fontSize: '13px', marginBottom: '4px', color: 'var(--text-muted)' }}>
+                    <span>Selected Seats:</span>
+                    <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{selectedSeats.length}</span>
                   </div>
-                  <div className="flex items-center justify-between" style={{ fontSize: '18px', fontWeight: 800 }}>
-                    <span>Total Amount:</span>
-                    <span style={{ color: 'var(--success)' }}>${totalPrice.toFixed(2)}</span>
+                  <div className="flex items-center justify-between" style={{ fontSize: '16px', fontWeight: 700 }}>
+                    <span>Total:</span>
+                    <span>${totalPrice.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -255,10 +245,9 @@ export default function EventDetailPage() {
                   onClick={handleConfirmBooking}
                   disabled={bookingLoading}
                   className="btn btn-primary"
-                  style={{ width: '100%', padding: '12px' }}
+                  style={{ width: '100%' }}
                 >
-                  <ShieldCheck size={16} />
-                  <span>{bookingLoading ? 'Securing Seats...' : isAuthenticated ? 'Confirm & Purchase' : 'Sign In to Book'}</span>
+                  {bookingLoading ? 'Processing...' : isAuthenticated ? 'Confirm Booking' : 'Sign In to Book'}
                 </button>
               </div>
             )}
