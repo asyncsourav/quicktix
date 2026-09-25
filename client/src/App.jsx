@@ -9,13 +9,18 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import CreateEventPage from './pages/CreateEventPage';
+import AdminDashboard from './pages/AdminDashboard';
 
-// Protected Route wrapper for authenticated users
-function ProtectedRoute({ children, requireOrganizer = false }) {
-  const { isAuthenticated, isOrganizer } = useAuth();
+// Protected Route wrapper for authenticated users with role guards
+function ProtectedRoute({ children, requireOrganizer = false, requireAdmin = false }) {
+  const { isAuthenticated, isOrganizer, isAdmin } = useAuth();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (requireAdmin && !isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   if (requireOrganizer && !isOrganizer) {
@@ -50,6 +55,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requireOrganizer>
                     <CreateEventPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminDashboard />
                   </ProtectedRoute>
                 }
               />
