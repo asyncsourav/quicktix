@@ -113,7 +113,7 @@ public class VenueService {
     }
 
     /**
-     * Deletes a venue. Enforces owner or ADMIN permissions.
+     * Deletes a venue. Enforces owner or ADMIN permissions
      */
     @Transactional
     public void deleteVenue(Long id, String currentUserEmail) {
