@@ -1,4 +1,8 @@
+
+
 package com.asyncsourav.quicktix.security;
+
+
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -9,27 +13,30 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * JWT Authentication Filter (equivalent to Node/Express auth middleware).
- * Intercepts incoming requests, extracts the Bearer token, validates it,
- * and sets the authenticated user in Spring's SecurityContextHolder.
- */
+
+
+
+
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
+
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
 
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request, 
+            HttpServletResponse response, 
+            FilterChain filterChain
+        ) throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
 
@@ -41,6 +48,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         // 2. Extract token from header
         String token = authHeader.substring(7);
+        /* 
+        Suppose: authHeader = Bearer abc123xyz
+        Indexes are: Bearer abc123xyz
+                     0123456...
+
+        "Bearer " contains 7 characters: and hence we start with 7th Indexes
+        */
+
         String email = jwtUtil.extractEmail(token);
 
         // 3. If token has valid email and user is not yet authenticated in context
@@ -53,7 +68,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                         null,
                         userDetails.getAuthorities()
                 );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
