@@ -56,20 +56,26 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         "Bearer " contains 7 characters: and hence we start with 7th Indexes
         */
 
-        String email = jwtUtil.extractEmail(token);
+        try {
+            String email = jwtUtil.extractEmail(token);
 
-        // 3. If token has valid email and user is not yet authenticated in context
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            // 3. If token has valid email and user is not yet authenticated in context
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-            if (jwtUtil.isTokenValid(token, userDetails.getUsername())) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (jwtUtil.isTokenValid(token, userDetails.getUsername())) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // Token has expired; proceed unauthenticated so Spring Security returns clean 401 or allows public endpoints
+        } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
+            // Malformed or invalid token; proceed unauthenticated
         }
 
         // 4. Continue the request chain

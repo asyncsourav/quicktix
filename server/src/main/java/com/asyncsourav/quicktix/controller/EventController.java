@@ -1,4 +1,7 @@
+
+
 package com.asyncsourav.quicktix.controller;
+
 
 import com.asyncsourav.quicktix.dto.common.ApiResponse;
 import com.asyncsourav.quicktix.dto.request.EventCreateRequest;
@@ -16,16 +19,20 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+
+
 @RestController
 @RequestMapping("/api/events")
 @RequiredArgsConstructor
 public class EventController {
 
+
     private final EventService eventService;
+
 
     /**
      * POST /api/events
-     * Creates a new event and auto-populates its seat layout. Restricted to ORGANIZER and ADMIN.
+     * Creates a new event and auto-populates its seat layout. Restricted to only ORGANIZER and ADMIN.
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
@@ -37,8 +44,12 @@ public class EventController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Event created and seats generated successfully", response));
+                .body(ApiResponse.success(
+                        "Event created and seats generated successfully", 
+                        response
+                ));
     }
+
 
     /**
      * GET /api/events
@@ -53,6 +64,7 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success("Events fetched successfully", events));
     }
 
+
     /**
      * GET /api/events/{id}
      * Public endpoint to get event details.
@@ -63,6 +75,7 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success("Event fetched successfully", event));
     }
 
+
     /**
      * GET /api/events/{id}/seats
      * Public endpoint to get the real-time seat map and availability for an event.
@@ -72,6 +85,7 @@ public class EventController {
         List<SeatResponse> seats = eventService.getEventSeats(id);
         return ResponseEntity.ok(ApiResponse.success("Seats fetched successfully", seats));
     }
+
 
     /**
      * PUT /api/events/{id}
@@ -88,6 +102,7 @@ public class EventController {
         return ResponseEntity.ok(ApiResponse.success("Event updated successfully", response));
     }
 
+    
     /**
      * DELETE /api/events/{id}
      * Deletes an event. Restricted to owning ORGANIZER or ADMIN.

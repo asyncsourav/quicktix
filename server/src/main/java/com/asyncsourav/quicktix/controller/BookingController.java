@@ -1,4 +1,7 @@
+
+
 package com.asyncsourav.quicktix.controller;
+
 
 import com.asyncsourav.quicktix.dto.common.ApiResponse;
 import com.asyncsourav.quicktix.dto.request.BookingRequest;
@@ -15,19 +18,23 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+
+
 @RestController
 @RequestMapping("/api/bookings")
+@PreAuthorize ("isAuthenticated()")
 @RequiredArgsConstructor
 public class BookingController {
 
+
     private final BookingService bookingService;
+
 
     /**
      * POST /api/bookings
      * Creates a new booking. Protected with Optimistic Locking.
      */
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody BookingRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -44,7 +51,6 @@ public class BookingController {
      * Returns all bookings belonging to the currently authenticated user.
      */
     @GetMapping("/me")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyBookings(
             @AuthenticationPrincipal UserDetails userDetails) {
 
@@ -57,7 +63,6 @@ public class BookingController {
      * Returns details of a specific booking.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<BookingResponse>> getBookingById(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -71,7 +76,6 @@ public class BookingController {
      * Cancels a booking and releases all associated seats back to AVAILABLE.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails userDetails) {

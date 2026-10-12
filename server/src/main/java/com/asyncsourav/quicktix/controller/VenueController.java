@@ -26,8 +26,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VenueController {
 
+
     private final VenueService venueService;
 
+    
     /**
      * POST /api/venues
      * Creates a new venue. Restricted to ORGANIZER and ADMIN roles.
