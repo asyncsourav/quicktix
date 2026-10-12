@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,6 +22,7 @@ import java.util.List;
 
 
 
+@Tag(name = "Bookings", description = "Endpoints for seat reservation and booking management with concurrency safety")
 @RestController
 @RequestMapping("/api/bookings")
 @PreAuthorize ("isAuthenticated()")
@@ -34,6 +37,7 @@ public class BookingController {
      * POST /api/bookings
      * Creates a new booking. Protected with Optimistic Locking.
      */
+    @Operation(summary = "Create booking", description = "Reserves selected seats and confirms booking. Protected against race conditions via JPA optimistic locking.")
     @PostMapping
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody BookingRequest request,
@@ -50,6 +54,7 @@ public class BookingController {
      * GET /api/bookings/me
      * Returns all bookings belonging to the currently authenticated user.
      */
+    @Operation(summary = "Get user bookings", description = "Returns all confirmed/cancelled bookings belonging to the currently authenticated user.")
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyBookings(
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -62,6 +67,7 @@ public class BookingController {
      * GET /api/bookings/{id}
      * Returns details of a specific booking.
      */
+    @Operation(summary = "Get booking by ID", description = "Returns details and reserved seat items of a specific booking.")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<BookingResponse>> getBookingById(
             @PathVariable Long id,
@@ -75,6 +81,7 @@ public class BookingController {
      * DELETE /api/bookings/{id}
      * Cancels a booking and releases all associated seats back to AVAILABLE.
      */
+    @Operation(summary = "Cancel booking", description = "Cancels a booking and immediately releases all associated seats back to AVAILABLE.")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(
             @PathVariable Long id,
