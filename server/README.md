@@ -42,6 +42,7 @@ erDiagram
     USER ||--o{ VENUE : organizes
     USER ||--o{ EVENT : creates
     USER ||--o{ BOOKING : places
+    USER ||--o{ REFRESH_TOKEN : owns
     VENUE ||--o{ EVENT : hosts
     EVENT ||--o{ SEAT : contains
     EVENT ||--o{ BOOKING : reserved_for
@@ -53,6 +54,17 @@ erDiagram
         varchar email UK
         varchar password_hash
         varchar role "ADMIN | ORGANIZER | USER"
+        timestamp created_at
+    }
+
+    REFRESH_TOKEN {
+        bigint id PK
+        bigint user_id FK
+        varchar token_hash UK
+        varchar family_id
+        boolean used
+        boolean revoked
+        timestamp expires_at
         timestamp created_at
     }
 
@@ -102,6 +114,7 @@ erDiagram
 | Entity | Primary Key | Critical Constraints | Concurrency Attribute |
 | :--- | :--- | :--- | :--- |
 | `User` | `Long id` | `email` is unique and normalized to lowercase | None |
+| `RefreshToken` | `Long id` | `token_hash` unique index, `family_id` indexed, FK to `User` | None |
 | `Venue` | `Long id` | Foreign key to `User` (Organizer) | None |
 | `Event` | `Long id` | Foreign keys to `Venue` and `User` (Organizer) | None |
 | `Seat` | `Long id` | Unique index on `(event_id, seat_label)` | `@Version private Long version;` |
@@ -306,12 +319,14 @@ Settings are externalized via environment variables and configured across `appli
 }
 ```
 
-### Complete Endpoint Registry (22 Endpoints)
+### Complete Endpoint Registry (24 Endpoints)
 
 | Group | Method | Path | Required Role | Summary |
 | :--- | :---: | :--- | :---: | :--- |
 | **Auth** | `POST` | `/api/auth/register` | Public | Register new user account |
-| | `POST` | `/api/auth/login` | Public | Authenticate user and issue JWT |
+| | `POST` | `/api/auth/login` | Public | Authenticate user and issue dual token pair |
+| | `POST` | `/api/auth/refresh` | Public | Rotate refresh token with token-family reuse detection |
+| | `POST` | `/api/auth/logout` | Public | Revoke active refresh token session family |
 | **Events** | `GET` | `/api/events` | Public | List events with category & search filters |
 | | `GET` | `/api/events/{id}` | Public | Get event details by ID |
 | | `GET` | `/api/events/{id}/seats` | Public | Get seat map and availability |
@@ -332,6 +347,18 @@ Settings are externalized via environment variables and configured across `appli
 | | `GET` | `/api/admin/stats` | `ADMIN` | Platform aggregate revenue & booking statistics |
 | | `GET` | `/api/admin/bookings` | `ADMIN` | Platform-wide booking audit ledger |
 | **Health** | `GET` | `/api/ping` | Public | Healthcheck and service liveness probe |
+
+---
+
+## Token Rotation & Reuse Detection Pipeline
+
+1. **Hash Storage**: Refresh tokens are never stored as plaintext in PostgreSQL. The SHA-256 hash (`HexFormat.of().formatHex(digest.digest(rawToken))`) is stored in `refresh_tokens.token_hash`.
+2. **Session Familying**: Each login initializes a unique `family_id` (UUID). All subsequent rotations within that session inherit this `family_id`.
+3. **Single-Use Invalidation**: When `/api/auth/refresh` succeeds, the provided refresh token is immediately marked `used = true`.
+4. **Automated Breach Invalidation**: If an already-used or revoked token is presented to `/api/auth/refresh`:
+   * Spring Boot detects the compromise.
+   * `refreshTokenRepository.revokeFamily(familyId)` updates `revoked = true` for every token in that family.
+   * A security warning is logged and HTTP 401 Unauthorized is returned, forcing full re-authentication for all parties.
 
 ---
 

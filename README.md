@@ -162,14 +162,16 @@ QuickTix features full interactive OpenAPI 3.0 documentation via Swagger UI.
 * **Swagger UI:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 * **OpenAPI Specification JSON:** [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
 
-<!-- SCREENSHOT: Swagger UI documentation showing 22 endpoints organized across Auth, Events, Venues, Bookings, Admin, and Health -->
+<!-- SCREENSHOT: Swagger UI documentation showing 24 endpoints organized across Auth, Events, Venues, Bookings, Admin, and Health -->
 
-### API Endpoint Registry (22 Endpoints)
+### API Endpoint Registry (24 Endpoints)
 
 | Domain | Method | Endpoint | Authorization | Description |
 | :--- | :---: | :--- | :---: | :--- |
 | **Auth** | `POST` | `/api/auth/register` | Public | Register new account with BCrypt password hashing |
-| | `POST` | `/api/auth/login` | Public | Authenticate credentials and receive signed JWT |
+| | `POST` | `/api/auth/login` | Public | Authenticate credentials and receive dual token pair |
+| | `POST` | `/api/auth/refresh` | Public | Rotate refresh token with token-family reuse detection |
+| | `POST` | `/api/auth/logout` | Public | Revoke active refresh token session family |
 | **Events** | `GET` | `/api/events` | Public | Query events with category and keyword search filters |
 | | `GET` | `/api/events/{id}` | Public | Retrieve detailed event metadata |
 | | `GET` | `/api/events/{id}/seats` | Public | Fetch current seat layout and availability status |
@@ -190,6 +192,18 @@ QuickTix features full interactive OpenAPI 3.0 documentation via Swagger UI.
 | | `GET` | `/api/admin/stats` | Admin | Real-time aggregate revenue and utilization metrics |
 | | `GET` | `/api/admin/bookings` | Admin | Platform-wide transaction ledger audit |
 | **Health** | `GET` | `/api/ping` | Public | Service liveness probe |
+
+---
+
+## Security Architecture: Dual Token Rotation & Reuse Detection
+
+QuickTix implements **Rotating Refresh Tokens with Session Family Tracking and Automated Reuse Detection**:
+
+1. **Short-Lived Access Tokens (15 Minutes)**: Stateless JWTs carry user identity and permissions to backend API requests.
+2. **Opaque Long-Lived Refresh Tokens (7 Days)**: Stored in the database as **SHA-256 hashes** (`refresh_tokens` table) to prevent token compromise in the event of a database dump.
+3. **Token Rotation**: Every call to `POST /api/auth/refresh` invalidates the submitted refresh token (`used = true`) and issues a brand-new access token and refresh token belonging to the same `family_id`.
+4. **Token Family Reuse Detection**: If an already-used or revoked refresh token is presented again (indicating token interception or replay attacks), the server immediately revokes **all tokens in that family** (`revoked = true`). Both the attacker and the victim are logged out, preventing unauthorized access.
+5. **Silent Client Refresh**: The React client uses an Axios response interceptor that transparently queues outgoing requests on HTTP 401, calls `/api/auth/refresh`, and replays requests without disrupting the user experience.
 
 ---
 
@@ -243,7 +257,7 @@ When launched against an uninitialized database, `DataInitializer` seeds test ac
 - [x] Phase 3: Optimistic Locking Concurrency Control (`@Version`), Race Condition Verification
 - [x] Phase 4: OpenAPI 3.0 / Swagger UI Interactive Documentation (`springdoc-openapi`)
 - [x] Phase 5: Multi-Stage Docker Containerization, Full-Stack Docker Compose Orchestration
-- [ ] Phase 6: Dual rotating JWT refresh tokens with token family reuse detection
+- [x] Phase 6: Dual rotating JWT refresh tokens with token family reuse detection
 - [ ] Phase 7: Distributed caching with Redis for hot read paths (event listings, seat maps)
 - [ ] Phase 8: Distributed API rate limiting via Bucket4j and token bucket algorithms
 - [ ] Phase 9: Real-time seat reservation broadcasts over WebSocket / STOMP protocol
