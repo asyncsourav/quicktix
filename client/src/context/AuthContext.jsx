@@ -9,17 +9,26 @@ export const AuthProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : null;
   });
   const [token, setToken] = useState(() => localStorage.getItem('quicktix_token'));
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem('quicktix_refresh_token'));
   const [loading, setLoading] = useState(false);
 
   const login = async (email, password) => {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      // res.data is AuthResponse { token, tokenType, user }
+      // res.data is AuthResponse { token, accessToken, refreshToken, tokenType, user }
       const authData = res.data;
-      setToken(authData.token);
+      const accessToken = authData.token || authData.accessToken;
+      const newRefreshToken = authData.refreshToken;
+
+      setToken(accessToken);
+      setRefreshToken(newRefreshToken);
       setUser(authData.user);
-      localStorage.setItem('quicktix_token', authData.token);
+
+      localStorage.setItem('quicktix_token', accessToken);
+      if (newRefreshToken) {
+        localStorage.setItem('quicktix_refresh_token', newRefreshToken);
+      }
       localStorage.setItem('quicktix_user', JSON.stringify(authData.user));
       return authData.user;
     } finally {
@@ -38,11 +47,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('quicktix_token');
-    localStorage.removeItem('quicktix_user');
+  const logout = async () => {
+    const storedRefresh = localStorage.getItem('quicktix_refresh_token');
+    try {
+      if (storedRefresh) {
+        await api.post('/auth/logout', { refreshToken: storedRefresh });
+      }
+    } catch {
+      // Ignore network failures on logout
+    } finally {
+      setUser(null);
+      setToken(null);
+      setRefreshToken(null);
+      localStorage.removeItem('quicktix_token');
+      localStorage.removeItem('quicktix_refresh_token');
+      localStorage.removeItem('quicktix_user');
+    }
   };
 
   const isOrganizer = user?.role === 'ORGANIZER' || user?.role === 'ADMIN';
@@ -53,6 +73,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         token,
+        refreshToken,
         loading,
         login,
         register,

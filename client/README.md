@@ -140,6 +140,17 @@ The application will start at `http://localhost:5173` (or `http://localhost:3000
 
 ---
 
+## Silent Token Refresh & Session Management
+
+The frontend automatically manages token lifecycles through an Axios interceptor pipeline:
+1. **Dual Storage**: Access tokens are held in `quicktix_token` and rotating refresh tokens in `quicktix_refresh_token`.
+2. **Transparent 401 Interception**: When an access token expires (HTTP 401), outgoing network requests are paused and placed into an in-memory queue.
+3. **Single Rotation Request**: The client dispatches a single call to `POST /api/auth/refresh` with the current refresh token.
+4. **Queue Replay**: Once the backend returns a new access token and rotating refresh token, `localStorage` is updated, the default authorization header is refreshed, and all queued requests are re-executed without user interruption.
+5. **Breach Handling**: If the refresh token is expired or flagged for reuse, the interceptor purges local session storage and redirects to `/login`.
+
+---
+
 ## Production Build & Deployment
 
 ### Production Compilation
