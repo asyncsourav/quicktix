@@ -15,6 +15,7 @@ The service handles authentication, venue administration, event publishing, auto
 
 The backend is organized into decoupled layers where each layer has a single responsibility:
 
+
 ```
 [ HTTP Requests ]
        │
