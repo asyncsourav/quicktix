@@ -64,8 +64,8 @@ class AuthServiceTest {
     void setUp() {
         testUser = User.builder()
                 .id(1L)
-                .name("Sourav")
-                .email("user@quicktix.com")
+                .name("Sourav Kumar")
+                .email("sourav@gmail.com")
                 .passwordHash("hashed_password")
                 .role(Role.USER)
                 .build();
@@ -74,7 +74,8 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("Login issues access token and saves hashed refresh token in database")
-    void login_ShouldIssueDualTokensAndPersistHashedRefreshToken() {
+    private void login_ShouldIssueDualTokensAndPersistHashedRefreshToken() {
+
         // Given
         LoginRequest request = new LoginRequest("user@quicktix.com", "password123");
         when(userRepository.findByEmail("user@quicktix.com")).thenReturn(Optional.of(testUser));
@@ -106,7 +107,8 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("Rotation successfully rotates tokens within the same session family")
-    void refresh_ShouldRotateTokensWithinSameFamily() {
+    private void refresh_ShouldRotateTokensWithinSameFamily() {
+
         // Given
         String rawToken = "current_raw_refresh_token";
         String tokenHash = JwtUtil.hashToken(rawToken);
@@ -149,7 +151,8 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("REUSE DETECTION: If an already-used refresh token is presented, revoke the entire family")
-    void refresh_WhenTokenIsAlreadyUsed_ShouldTriggerReuseDetectionAndRevokeFamily() {
+    private void refresh_WhenTokenIsAlreadyUsed_ShouldTriggerReuseDetectionAndRevokeFamily() {
+
         // Given
         String rawToken = "stolen_compromised_refresh_token";
         String tokenHash = JwtUtil.hashToken(rawToken);
@@ -182,7 +185,8 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("REUSE DETECTION: If a revoked token is presented, revoke the family")
-    void refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily() {
+    private void refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily() {
+
         // Given
         String rawToken = "revoked_token";
         String tokenHash = JwtUtil.hashToken(rawToken);
@@ -212,7 +216,8 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("Refresh token expiration check fails if token is past expiresAt")
-    void refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException() {
+    private void refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException() {
+
         // Given
         String rawToken = "expired_token";
         String tokenHash = JwtUtil.hashToken(rawToken);
@@ -241,7 +246,8 @@ class AuthServiceTest {
     
     @Test
     @DisplayName("Logout revokes the entire token family")
-    void logout_ShouldRevokeSessionFamily() {
+    private void logout_ShouldRevokeSessionFamily() {
+        
         // Given
         String rawToken = "logout_token";
         String tokenHash = JwtUtil.hashToken(rawToken);
