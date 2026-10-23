@@ -24,20 +24,16 @@ QuickTix is designed as a decoupled, containerized client-server system with str
 [ Spring Boot 4 Application Service ] (Port 8080)
    │
    ├── Security Filter Chain
-         │
    │     ├── Stateless JwtAuthFilter (Bearer token validation)
    │     └── CORS Filter (Dynamic origins configured via application.yml)
    │
    ├── Web Layer (@RestController)
-         │
    │     └── DTO validation, REST responses (ApiResponse<T>, ErrorResponse)
    │
    ├── Caching Layer (Spring Data Redis / Lettuce)
-         │
    │     └── Redis Cache Manager (@Cacheable hot paths, @CacheEvict, 5-min TTL)
    │
    ├── Business Layer (@Service)
-         │
    │     ├── BookingService (Atomic @Transactional reservations)
    │     ├── AuthService (Dual-token rotation, HttpOnly cookie, reuse detection)
    │     └── Ownership Guards (Organizer resource validation)
