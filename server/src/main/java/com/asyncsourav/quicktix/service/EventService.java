@@ -14,6 +14,7 @@ import com.asyncsourav.quicktix.repository.UserRepository;
 import com.asyncsourav.quicktix.repository.VenueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,28 +29,42 @@ import java.util.List;
 @RequiredArgsConstructor
 public class EventService {
 
+
     private final EventRepository eventRepository;
     private final VenueRepository venueRepository;
     private final UserRepository userRepository;
     private final SeatRepository seatRepository;
+
+
 
     /**
      * Creates an event and auto-generates all initial seats based on venue capacity.
      */
     @Transactional
     public EventResponse createEvent(EventCreateRequest request, String organizerEmail) {
+
         User organizer = userRepository.findByEmail(organizerEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", organizerEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User", 
+                        "email", 
+                        organizerEmail
+                ));
 
         Venue venue = venueRepository.findById(request.venueId())
-                .orElseThrow(() -> new ResourceNotFoundException("Venue", "id", request.venueId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Venue", 
+                        "id", 
+                        request.venueId()
+                ));
 
         boolean isAdmin = organizer.getRole() == Role.ADMIN;
         boolean isVenueOwner = venue.getOrganizer().getId().equals(organizer.getId());
 
         if (!isAdmin && !isVenueOwner) {
-            log.warn("Organizer {} tried to schedule event at venue ID {} owned by another organizer",
-                    organizerEmail, venue.getId());
+            log.warn(
+                    "Organizer {} tried to schedule event at venue ID {} owned by another organizer",
+                    organizerEmail, venue.getId()
+            );
             throw new AccessDeniedException("You can only schedule events at venues you own.");
         }
 
@@ -64,18 +79,28 @@ public class EventService {
                 .build();
 
         Event savedEvent = eventRepository.save(event);
-        log.info("Event '{}' created with ID: {}", savedEvent.getTitle(), savedEvent.getId());
+        log.info(
+                "Event '{}' created with ID: {}", 
+                savedEvent.getTitle(), 
+                savedEvent.getId()
+        );
 
         // Auto-generate seats for this event based on venue capacity (e.g., A1, A2, ...)
-        generateSeatsForEvent(savedEvent, venue.getTotalCapacity());
+        generateSeatsForEvent(
+                savedEvent, 
+                venue.getTotalCapacity()
+        );
 
         return EventResponse.fromEntity(savedEvent);
     }
+
+
 
     /**
      * Helper method to generate seat records for an event.
      */
     private void generateSeatsForEvent(Event event, int capacity) {
+
         List<Seat> seats = new ArrayList<>(capacity);
         int seatsPerRow = 10;
 
@@ -95,14 +120,25 @@ public class EventService {
         }
 
         seatRepository.saveAll(seats);
-        log.info("Generated {} seats for event ID: {}", seats.size(), event.getId());
+        log.info(
+                "Generated {} seats for event ID: {}", 
+                seats.size(), 
+                event.getId()
+        );
     }
+
+
 
     /**
      * Retrieves events with optional category and search keyword filters.
      */
+    @Cacheable(
+            value = "events",
+            key = "(#category != null && !#category.isBlank() ? #category.trim().toLowerCase() : 'all') + ':' + (#search != null && !#search.isBlank() ? #search.trim().toLowerCase() : 'all')"
+    )
     @Transactional(readOnly = true)
     public List<EventResponse> getAllEvents(String category, String search) {
+
         List<Event> events;
 
         if (category != null && !category.isBlank()) {
@@ -113,27 +149,44 @@ public class EventService {
             events = eventRepository.findAll();
         }
 
-        return events.stream().map(EventResponse::fromEntity).toList();
+        return events.stream()
+                .map(EventResponse::fromEntity)
+                .toList();
     }
+
+
 
     /**
      * Retrieves a single event by ID.
      */
+    @Cacheable(value = "event", key = "#id")
     @Transactional(readOnly = true)
     public EventResponse getEventById(Long id) {
+
         Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Event", "id", id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Event", 
+                        "id", 
+                        id
+                ));
 
         return EventResponse.fromEntity(event);
     }
+
+
 
     /**
      * Retrieves the real-time interactive seat map for an event.
      */
     @Transactional(readOnly = true)
     public List<SeatResponse> getEventSeats(Long eventId) {
+
         if (!eventRepository.existsById(eventId)) {
-            throw new ResourceNotFoundException("Event", "id", eventId);
+            throw new ResourceNotFoundException(
+                    "Event", 
+                    "id", 
+                    eventId
+            );
         }
 
         return seatRepository.findByEventIdOrderBySeatLabelAsc(eventId)
@@ -142,22 +195,37 @@ public class EventService {
                 .toList();
     }
 
+
+
     /**
      * Updates an existing event. Restricted to the organizer or an ADMIN.
      */
     @Transactional
     public EventResponse updateEvent(Long id, EventCreateRequest request, String currentUserEmail) {
+        
         Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Event", "id", id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Event", 
+                        "id", 
+                        id
+                ));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", currentUserEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User", 
+                        "email", 
+                        currentUserEmail
+                ));
 
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
         boolean isOwner = event.getOrganizer().getId().equals(currentUser.getId());
 
         if (!isAdmin && !isOwner) {
-            log.warn("Unauthorized event update attempt on event ID: {} by user: {}", id, currentUserEmail);
+            log.warn(
+                    "Unauthorized event update attempt on event ID: {} by user: {}", 
+                    id, 
+                    currentUserEmail
+            );
             throw new AccessDeniedException("You do not have permission to modify this event.");
         }
 
@@ -168,31 +236,54 @@ public class EventService {
         event.setBasePrice(request.basePrice());
 
         Event updatedEvent = eventRepository.save(event);
-        log.info("Event ID: {} updated successfully by: {}", id, currentUserEmail);
+        log.info(
+                "Event ID: {} updated successfully by: {}", 
+                id, 
+                currentUserEmail
+        );
 
         return EventResponse.fromEntity(updatedEvent);
     }
+
+
 
     /**
      * Deletes an event. Restricted to the organizer or an ADMIN.
      */
     @Transactional
     public void deleteEvent(Long id, String currentUserEmail) {
+
         Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Event", "id", id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Event", 
+                        "id", 
+                        id
+                ));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", currentUserEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User", 
+                        "email", 
+                        currentUserEmail
+                ));
 
         boolean isAdmin = currentUser.getRole() == Role.ADMIN;
         boolean isOwner = event.getOrganizer().getId().equals(currentUser.getId());
 
         if (!isAdmin && !isOwner) {
-            log.warn("Unauthorized event deletion attempt on event ID: {} by user: {}", id, currentUserEmail);
+            log.warn(
+                    "Unauthorized event deletion attempt on event ID: {} by user: {}", 
+                    id, 
+                    currentUserEmail
+            );
             throw new AccessDeniedException("You do not have permission to delete this event.");
         }
 
         eventRepository.delete(event);
-        log.info("Event ID: {} deleted successfully by: {}", id, currentUserEmail);
+        log.info(
+                "Event ID: {} deleted successfully by: {}", 
+                id, 
+                currentUserEmail
+        );
     }
 }
