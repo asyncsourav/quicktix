@@ -1,4 +1,8 @@
+
+
 package com.asyncsourav.quicktix.service;
+
+
 
 import com.asyncsourav.quicktix.dto.request.LoginRequest;
 import com.asyncsourav.quicktix.dto.request.RefreshTokenRequest;
@@ -31,8 +35,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
+
+
+
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
+
 
     @Mock
     private UserRepository userRepository;
@@ -51,6 +59,8 @@ class AuthServiceTest {
 
     private User testUser;
 
+
+
     @BeforeEach
     void setUp() {
         testUser = User.builder()
@@ -61,6 +71,9 @@ class AuthServiceTest {
                 .role(Role.USER)
                 .build();
     }
+
+
+
 
     @Test
     @DisplayName("Login issues access token and saves hashed refresh token in database")
@@ -92,6 +105,9 @@ class AuthServiceTest {
         assertThat(savedToken.isUsed()).isFalse();
         assertThat(savedToken.isRevoked()).isFalse();
     }
+
+
+
 
     @Test
     @DisplayName("Rotation successfully rotates tokens within the same session family")
@@ -137,6 +153,9 @@ class AuthServiceTest {
         assertThat(newTokenEntity.isRevoked()).isFalse();
     }
 
+
+
+
     @Test
     @DisplayName("CONCURRENCY: If two simultaneous refreshes occur, the losing request fails to claim the token and revokes the family")
     void refresh_WhenConcurrentClaimLosesRace_ShouldTriggerReuseDetectionAndRevokeFamily() {
@@ -168,6 +187,9 @@ class AuthServiceTest {
         verify(jwtUtil, never()).generateAccessToken(any());
         verify(refreshTokenRepository, never()).save(any());
     }
+
+
+
 
     @Test
     @DisplayName("REUSE DETECTION: If an already-used refresh token is presented, revoke the entire family")
@@ -202,6 +224,9 @@ class AuthServiceTest {
         verify(jwtUtil, never()).generateAccessToken(any());
     }
 
+
+
+
     @Test
     @DisplayName("REUSE DETECTION: If a revoked token is presented, revoke the family")
     void refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily() {
@@ -231,6 +256,9 @@ class AuthServiceTest {
         verify(refreshTokenRepository).revokeFamily(familyId);
     }
 
+
+
+
     @Test
     @DisplayName("Refresh token expiration check fails if token is past expiresAt")
     void refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException() {
@@ -259,6 +287,9 @@ class AuthServiceTest {
         verify(refreshTokenRepository, never()).revokeFamily(anyString());
     }
 
+
+
+    
     @Test
     @DisplayName("Logout revokes the entire token family")
     void logout_ShouldRevokeSessionFamily() {
