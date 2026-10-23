@@ -15,21 +15,28 @@ export default function Navbar() {
   };
 
   return (
-    <header style={{ borderBottom: '1px solid var(--panel-border)', background: 'var(--panel)', position: 'sticky', top: 0, zIndex: 50 }}>
-      <div className="container flex items-center justify-between" style={{ height: '60px' }}>
+    <header className="navbar-header" style={{ borderBottom: '1px solid var(--panel-border)', background: 'var(--panel-glass)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div className="container flex items-center justify-between" style={{ height: '62px' }}>
         {/* Logo */}
-        <Link to="/" style={{ fontWeight: 700, fontSize: '18px', letterSpacing: '-0.3px', color: 'var(--text-main)' }}>
-          Quick<span style={{ color: 'var(--primary)' }}>Tix</span>
+        <Link to="/" style={{ fontWeight: 800, fontSize: '19px', letterSpacing: '-0.4px', color: 'var(--text-main)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <span>Quick<span style={{ color: 'var(--primary)' }}>Tix</span></span>
+          <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 6px', letterSpacing: '0.5px' }}>PRO</span>
         </Link>
 
         {/* Navigation Links */}
-        <nav className="flex items-center gap-5">
-          <Link to="/" style={{ fontSize: '13.5px', color: 'var(--text-muted)' }}>
-            Events
-          </Link>
+        <nav className="flex items-center gap-6">
+          <a href="/#events" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
+            Live Events
+          </a>
+          <a href="/#architecture" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
+            Architecture
+          </a>
+          <a href="/#how-it-works" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
+            How It Works
+          </a>
 
           {isOrganizer && (
-            <Link to="/organizer/create" style={{ fontSize: '13.5px', color: 'var(--text-muted)' }}>
+            <Link to="/organizer/create" style={{ fontSize: '13.5px', color: 'var(--text-muted)' }} className="nav-link">
               Create Event
             </Link>
           )}
@@ -41,7 +48,7 @@ export default function Navbar() {
           )}
 
           {isAuthenticated && (
-            <Link to="/my-bookings" style={{ fontSize: '13.5px', color: 'var(--text-muted)' }}>
+            <Link to="/my-bookings" style={{ fontSize: '13.5px', color: 'var(--text-muted)' }} className="nav-link">
               My Bookings
             </Link>
           )}
