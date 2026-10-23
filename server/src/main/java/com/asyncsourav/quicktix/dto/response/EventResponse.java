@@ -1,12 +1,15 @@
 
+
 package com.asyncsourav.quicktix.dto.response;
 
 
 import com.asyncsourav.quicktix.entity.Event;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
 
 
 /*
@@ -54,7 +57,9 @@ public record EventResponse(
 
         @Schema(description = "Creation timestamp", example = "2026-09-25T12:00:00")
         LocalDateTime createdAt
-) {
+) implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     public static EventResponse fromEntity(Event event) {
 
