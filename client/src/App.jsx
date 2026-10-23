@@ -14,7 +14,15 @@ import AdminDashboard from './pages/AdminDashboard';
 
 // Protected Route wrapper for authenticated users with role guards
 function ProtectedRoute({ children, requireOrganizer = false, requireAdmin = false }) {
-  const { isAuthenticated, isOrganizer, isAdmin } = useAuth();
+  const { isAuthenticated, isOrganizer, isAdmin, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <p style={{ color: 'var(--text-muted, #94a3b8)' }}>Verifying session...</p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

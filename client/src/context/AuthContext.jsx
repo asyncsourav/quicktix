@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api/client';
+import axios from 'axios';
+import api, { setAccessToken, setOnSessionExpired, clearSession } from '../api/client';
 
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -8,28 +10,74 @@ export const AuthProvider = ({ children }) => {
     const saved = localStorage.getItem('quicktix_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [token, setToken] = useState(() => localStorage.getItem('quicktix_token'));
-  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem('quicktix_refresh_token'));
-  const [loading, setLoading] = useState(false);
+  const [token, setToken] = useState(null); // Kept in memory only
+  const [loading, setLoading] = useState(true);
+
+  // Synchronize expired session event from API response interceptor
+  useEffect(() => {
+    setOnSessionExpired(() => {
+      setToken(null);
+      setUser(null);
+    });
+  }, []);
+
+  // Silent restore session on initial app load using HttpOnly refresh cookie
+  useEffect(() => {
+    let isMounted = true;
+
+    const restoreSession = async () => {
+      // Clean up legacy localStorage tokens from older version if any exist
+      localStorage.removeItem('quicktix_token');
+      localStorage.removeItem('quicktix_refresh_token');
+
+      try {
+        const res = await axios.post(`${baseURL}/auth/refresh`, {}, { withCredentials: true });
+        const authData = res.data?.data || res.data;
+        const accessToken = authData.token || authData.accessToken;
+
+        if (isMounted && accessToken) {
+          setAccessToken(accessToken);
+          setToken(accessToken);
+          if (authData.user) {
+            setUser(authData.user);
+            localStorage.setItem('quicktix_user', JSON.stringify(authData.user));
+          }
+        }
+      } catch {
+        if (isMounted) {
+          setAccessToken(null);
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('quicktix_user');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const login = async (email, password) => {
     setLoading(true);
     try {
       const res = await api.post('/auth/login', { email, password });
-      // res.data is AuthResponse { token, accessToken, refreshToken, tokenType, user }
-      const authData = res.data;
+      const authData = res.data?.data || res.data || res;
       const accessToken = authData.token || authData.accessToken;
-      const newRefreshToken = authData.refreshToken;
 
+      setAccessToken(accessToken);
       setToken(accessToken);
-      setRefreshToken(newRefreshToken);
       setUser(authData.user);
 
-      localStorage.setItem('quicktix_token', accessToken);
-      if (newRefreshToken) {
-        localStorage.setItem('quicktix_refresh_token', newRefreshToken);
+      if (authData.user) {
+        localStorage.setItem('quicktix_user', JSON.stringify(authData.user));
       }
-      localStorage.setItem('quicktix_user', JSON.stringify(authData.user));
       return authData.user;
     } finally {
       setLoading(false);
@@ -40,7 +88,6 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       await api.post('/auth/register', { name, email, password, role });
-      // Automatically login after successful registration
       return await login(email, password);
     } finally {
       setLoading(false);
@@ -48,20 +95,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    const storedRefresh = localStorage.getItem('quicktix_refresh_token');
     try {
-      if (storedRefresh) {
-        await api.post('/auth/logout', { refreshToken: storedRefresh });
-      }
+      await api.post('/auth/logout', {});
     } catch {
       // Ignore network failures on logout
     } finally {
-      setUser(null);
+      clearSession();
       setToken(null);
-      setRefreshToken(null);
-      localStorage.removeItem('quicktix_token');
-      localStorage.removeItem('quicktix_refresh_token');
-      localStorage.removeItem('quicktix_user');
+      setUser(null);
     }
   };
 
@@ -73,7 +114,6 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         token,
-        refreshToken,
         loading,
         login,
         register,
@@ -93,3 +133,4 @@ export const useAuth = () => {
   if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
+

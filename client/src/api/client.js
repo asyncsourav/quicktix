@@ -2,19 +2,43 @@ import axios from 'axios';
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+// In-memory access token storage (never exposed to localStorage for XSS protection)
+let inMemoryAccessToken = null;
+let sessionExpiredCallback = null;
+
+export const setAccessToken = (token) => {
+  inMemoryAccessToken = token;
+};
+
+export const getAccessToken = () => inMemoryAccessToken;
+
+export const setOnSessionExpired = (callback) => {
+  sessionExpiredCallback = callback;
+};
+
+export const clearSession = () => {
+  inMemoryAccessToken = null;
+  localStorage.removeItem('quicktix_token');
+  localStorage.removeItem('quicktix_refresh_token');
+  localStorage.removeItem('quicktix_user');
+  if (sessionExpiredCallback) {
+    sessionExpiredCallback();
+  }
+};
+
 const api = axios.create({
   baseURL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor: attach JWT access token if available
+// Request interceptor: attach JWT access token from in-memory variable
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('quicktix_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (inMemoryAccessToken) {
+      config.headers.Authorization = `Bearer ${inMemoryAccessToken}`;
     }
     return config;
   },
@@ -36,16 +60,7 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-const clearSession = () => {
-  localStorage.removeItem('quicktix_token');
-  localStorage.removeItem('quicktix_refresh_token');
-  localStorage.removeItem('quicktix_user');
-  if (window.location.pathname !== '/login') {
-    window.location.href = '/login';
-  }
-};
-
-// Response interceptor: extract response body and silently refresh token on 401
+// Response interceptor: extract response body and silently refresh token on 401 using HttpOnly cookie
 api.interceptors.response.use(
   (response) => response.data,
   async (error) => {
@@ -77,12 +92,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      const refreshToken = localStorage.getItem('quicktix_refresh_token');
-      if (!refreshToken) {
-        clearSession();
-        return Promise.reject(error);
-      }
-
       // If a refresh is already in progress, enqueue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -99,25 +108,21 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Raw axios call to avoid interceptor recursion
-        const res = await axios.post(`${baseURL}/auth/refresh`, {
-          refreshToken,
-        });
+        // Raw axios call with credentials so the browser attaches the Secure HttpOnly cookie
+        const res = await axios.post(
+          `${baseURL}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
 
-        // Backend response format: { success: true, message: "...", data: { token, accessToken, refreshToken, user } }
         const authPayload = res.data?.data || res.data;
         const newAccessToken = authPayload.token || authPayload.accessToken;
-        const newRefreshToken = authPayload.refreshToken;
 
         if (!newAccessToken) {
           throw new Error('No access token returned from refresh');
         }
 
-        localStorage.setItem('quicktix_token', newAccessToken);
-        if (newRefreshToken) {
-          localStorage.setItem('quicktix_refresh_token', newRefreshToken);
-        }
-
+        setAccessToken(newAccessToken);
         api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
@@ -141,3 +146,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+
