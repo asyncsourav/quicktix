@@ -1,4 +1,8 @@
+
+
 package com.asyncsourav.quicktix.controller;
+
+
 
 import com.asyncsourav.quicktix.dto.common.ApiResponse;
 import com.asyncsourav.quicktix.dto.request.LoginRequest;
@@ -19,13 +23,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.*;
 
+
+
+
 @Tag(name = "Auth", description = "Endpoints for user registration, JWT authentication, and rotating refresh tokens")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
+
+
     private final AuthService authService;
+
+
 
     /**
      * POST /api/auth/register
@@ -44,6 +55,8 @@ public class AuthController {
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("User registered successfully", response));
     }
+
+
 
     /**
      * POST /api/auth/login
@@ -70,6 +83,8 @@ public class AuthController {
         return ResponseEntity
                 .ok(ApiResponse.success("Login successful", authResponse));
     }
+
+
 
     /**
      * POST /api/auth/refresh
@@ -103,6 +118,8 @@ public class AuthController {
         return ResponseEntity
                 .ok(ApiResponse.success("Token refreshed successfully", authResponse));
     }
+
+    
 
     /**
      * POST /api/auth/logout
