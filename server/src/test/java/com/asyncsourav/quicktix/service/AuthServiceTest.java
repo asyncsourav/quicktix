@@ -1,8 +1,4 @@
-
-
 package com.asyncsourav.quicktix.service;
-
-
 
 import com.asyncsourav.quicktix.dto.request.LoginRequest;
 import com.asyncsourav.quicktix.dto.request.RefreshTokenRequest;
@@ -35,10 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-
-
-
-
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
@@ -59,7 +51,6 @@ class AuthServiceTest {
 
     private User testUser;
 
-
     @BeforeEach
     void setUp() {
         testUser = User.builder()
@@ -71,10 +62,9 @@ class AuthServiceTest {
                 .build();
     }
 
-
     @Test
     @DisplayName("Login issues access token and saves hashed refresh token in database")
-    private void login_ShouldIssueDualTokensAndPersistHashedRefreshToken() {
+    void login_ShouldIssueDualTokensAndPersistHashedRefreshToken() {
 
         // Given
         LoginRequest request = new LoginRequest("user@quicktix.com", "password123");
@@ -103,11 +93,9 @@ class AuthServiceTest {
         assertThat(savedToken.isRevoked()).isFalse();
     }
 
-
-
     @Test
     @DisplayName("Rotation successfully rotates tokens within the same session family")
-    private void refresh_ShouldRotateTokensWithinSameFamily() {
+    void refresh_ShouldRotateTokensWithinSameFamily() {
 
         // Given
         String rawToken = "current_raw_refresh_token";
@@ -125,6 +113,7 @@ class AuthServiceTest {
                 .build();
 
         when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(existingToken));
+        when(refreshTokenRepository.markAsUsed(10L)).thenReturn(1);
         when(jwtUtil.generateAccessToken(testUser)).thenReturn("new_access_token");
         when(jwtUtil.generateRawRefreshToken()).thenReturn("new_raw_refresh_token");
         when(jwtUtil.getRefreshTokenExpirationMs()).thenReturn(604800000L);
@@ -135,23 +124,54 @@ class AuthServiceTest {
         // Then
         assertThat(response.accessToken()).isEqualTo("new_access_token");
         assertThat(response.refreshToken()).isEqualTo("new_raw_refresh_token");
-        assertThat(existingToken.isUsed()).isTrue();
+
+        verify(refreshTokenRepository).markAsUsed(10L);
 
         ArgumentCaptor<RefreshToken> newEntityCaptor = ArgumentCaptor.forClass(RefreshToken.class);
-        verify(refreshTokenRepository, times(2)).save(newEntityCaptor.capture());
+        verify(refreshTokenRepository).save(newEntityCaptor.capture());
 
-        RefreshToken newTokenEntity = newEntityCaptor.getAllValues().get(1);
+        RefreshToken newTokenEntity = newEntityCaptor.getValue();
         assertThat(newTokenEntity.getFamilyId()).isEqualTo(familyId); // Must belong to same family
         assertThat(newTokenEntity.getTokenHash()).isEqualTo(JwtUtil.hashToken("new_raw_refresh_token"));
         assertThat(newTokenEntity.isUsed()).isFalse();
         assertThat(newTokenEntity.isRevoked()).isFalse();
     }
 
+    @Test
+    @DisplayName("CONCURRENCY: If two simultaneous refreshes occur, the losing request fails to claim the token and revokes the family")
+    void refresh_WhenConcurrentClaimLosesRace_ShouldTriggerReuseDetectionAndRevokeFamily() {
 
+        // Given
+        String rawToken = "racing_refresh_token";
+        String tokenHash = JwtUtil.hashToken(rawToken);
+        String familyId = "racing-family-777";
+
+        RefreshToken racingToken = RefreshToken.builder()
+                .id(40L)
+                .user(testUser)
+                .tokenHash(tokenHash)
+                .familyId(familyId)
+                .used(false)
+                .revoked(false)
+                .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
+                .build();
+
+        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(racingToken));
+        when(refreshTokenRepository.markAsUsed(40L)).thenReturn(0); // Lost the race condition!
+
+        // When & Then
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(rawToken)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Refresh token reuse detected");
+
+        verify(refreshTokenRepository).revokeFamily(familyId);
+        verify(jwtUtil, never()).generateAccessToken(any());
+        verify(refreshTokenRepository, never()).save(any());
+    }
 
     @Test
     @DisplayName("REUSE DETECTION: If an already-used refresh token is presented, revoke the entire family")
-    private void refresh_WhenTokenIsAlreadyUsed_ShouldTriggerReuseDetectionAndRevokeFamily() {
+    void refresh_WhenTokenIsAlreadyUsed_ShouldTriggerReuseDetectionAndRevokeFamily() {
 
         // Given
         String rawToken = "stolen_compromised_refresh_token";
@@ -177,15 +197,14 @@ class AuthServiceTest {
 
         // Verify that the ENTIRE family was revoked!
         verify(refreshTokenRepository).revokeFamily(familyId);
+        verify(refreshTokenRepository, never()).markAsUsed(any());
         verify(refreshTokenRepository, never()).save(argThat(RefreshToken::isUsed));
         verify(jwtUtil, never()).generateAccessToken(any());
     }
 
-
-
     @Test
     @DisplayName("REUSE DETECTION: If a revoked token is presented, revoke the family")
-    private void refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily() {
+    void refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily() {
 
         // Given
         String rawToken = "revoked_token";
@@ -212,11 +231,9 @@ class AuthServiceTest {
         verify(refreshTokenRepository).revokeFamily(familyId);
     }
 
-
-
     @Test
     @DisplayName("Refresh token expiration check fails if token is past expiresAt")
-    private void refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException() {
+    void refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException() {
 
         // Given
         String rawToken = "expired_token";
@@ -242,11 +259,9 @@ class AuthServiceTest {
         verify(refreshTokenRepository, never()).revokeFamily(anyString());
     }
 
-
-    
     @Test
     @DisplayName("Logout revokes the entire token family")
-    private void logout_ShouldRevokeSessionFamily() {
+    void logout_ShouldRevokeSessionFamily() {
         
         // Given
         String rawToken = "logout_token";

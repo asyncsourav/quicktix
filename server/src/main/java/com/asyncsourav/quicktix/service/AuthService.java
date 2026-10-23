@@ -169,7 +169,7 @@ public class AuthService {
      * @param request payload containing the current raw refresh token
      * @return new dual token pair within the same session family
      */
-    @Transactional
+    @Transactional(noRollbackFor = BadCredentialsException.class)
     public AuthResponse refresh(RefreshTokenRequest request) {
         String rawToken = request.refreshToken().trim();
         String tokenHash = JwtUtil.hashToken(rawToken);
@@ -203,9 +203,20 @@ public class AuthService {
             );
         }
 
-        // 3. Invalidate current refresh token (single-use rotation)
-        token.setUsed(true);
-        refreshTokenRepository.save(token);
+        // 3. Atomically claim this token: only one concurrent request can win
+        int claimed = refreshTokenRepository.markAsUsed(token.getId());
+        if (claimed == 0) {
+            log.error(
+                    "SECURITY ALERT: Concurrent refresh token race detected! User ID: {} | Family: {} | Token ID: {}. Revoking entire token family.",
+                    token.getUser().getId(),
+                    token.getFamilyId(),
+                    token.getId()
+            );
+            refreshTokenRepository.revokeFamily(token.getFamilyId());
+            throw new BadCredentialsException(
+                    "Security violation: Refresh token reuse detected. All active sessions in this family have been terminated. Please log in again."
+            );
+        }
 
         // 4. Issue new access token
         String newAccessToken = jwtUtil.generateAccessToken(token.getUser());

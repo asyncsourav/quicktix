@@ -19,23 +19,35 @@ QuickTix is designed as a decoupled, containerized client-server system with str
 [ React 19 Client (Vite) ]
             │
             │ HTTPS / JSON (In-Memory Bearer JWT + HttpOnly Cookie)
+            │
             ▼
 [ Spring Boot 4 Application Service ] (Port 8080)
+   │
    ├── Security Filter Chain
+         │
    │     ├── Stateless JwtAuthFilter (Bearer token validation)
    │     └── CORS Filter (Dynamic origins configured via application.yml)
+   │
    ├── Web Layer (@RestController)
+         │
    │     └── DTO validation, REST responses (ApiResponse<T>, ErrorResponse)
+   │
    ├── Caching Layer (Spring Data Redis / Lettuce)
+         │
    │     └── Redis Cache Manager (@Cacheable hot paths, @CacheEvict, 5-min TTL)
+   │
    ├── Business Layer (@Service)
+         │
    │     ├── BookingService (Atomic @Transactional reservations)
    │     ├── AuthService (Dual-token rotation, HttpOnly cookie, reuse detection)
    │     └── Ownership Guards (Organizer resource validation)
+   │
    └── Persistence Layer (Spring Data JPA / Hibernate 7)
+         │
          └── Optimistic Concurrency Control (@Version check on Seat)
             │                              │
             │ Cache Reads & Invalidation   │ JDBC Connection Pool (HikariCP)
+            │                              │
             ▼                              ▼
 [ Redis 7 In-Memory Cache ]      [ PostgreSQL 16 Relational Database ]
 (Port 6379, Docker named volume)  (Port 5432, Docker named volume)
