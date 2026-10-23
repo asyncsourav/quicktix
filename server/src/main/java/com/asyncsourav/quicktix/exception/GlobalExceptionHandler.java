@@ -212,10 +212,14 @@ public class GlobalExceptionHandler {
                 ex.getMessage()
         );
 
+        String message = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Invalid email or password";
+
         ErrorResponse errorResponse = ErrorResponse.of(
                 HttpStatus.UNAUTHORIZED.value(),
                 HttpStatus.UNAUTHORIZED.getReasonPhrase(),
-                "Invalid email or password",
+                message,
                 request.getRequestURI()
         );
 
