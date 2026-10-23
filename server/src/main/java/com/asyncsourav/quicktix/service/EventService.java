@@ -14,7 +14,9 @@ import com.asyncsourav.quicktix.repository.UserRepository;
 import com.asyncsourav.quicktix.repository.VenueRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class EventService {
     /**
      * Creates an event and auto-generates all initial seats based on venue capacity.
      */
+    @CacheEvict(value = "events", allEntries = true)
     @Transactional
     public EventResponse createEvent(EventCreateRequest request, String organizerEmail) {
 
@@ -200,6 +203,10 @@ public class EventService {
     /**
      * Updates an existing event. Restricted to the organizer or an ADMIN.
      */
+    @Caching(evict = {
+            @CacheEvict(value = "events", allEntries = true),
+            @CacheEvict(value = "event", key = "#id")
+    })
     @Transactional
     public EventResponse updateEvent(Long id, EventCreateRequest request, String currentUserEmail) {
         
@@ -250,6 +257,10 @@ public class EventService {
     /**
      * Deletes an event. Restricted to the organizer or an ADMIN.
      */
+    @Caching(evict = {
+            @CacheEvict(value = "events", allEntries = true),
+            @CacheEvict(value = "event", key = "#id")
+    })
     @Transactional
     public void deleteEvent(Long id, String currentUserEmail) {
 
