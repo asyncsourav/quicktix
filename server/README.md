@@ -20,25 +20,28 @@ The backend is organized into decoupled layers where each layer has a single res
 [ HTTP Requests ]
        │
        ▼
-[ Security Filter Chain: JwtAuthFilter ]
-       │  (Validates Bearer JWT, sets SecurityContextHolder)
+[ Security Filter Chain: JwtAuthFilter & CorsFilter ]
+       │  (Validates In-Memory Bearer JWT, handles CORS dynamically via YAML)
        ▼
 [ Controller Layer: @RestController ]
-       │  (DTO validation with Jakarta @Valid, Swagger annotations)
+       │  (DTO validation with Jakarta @Valid, Swagger annotations, HttpOnly cookies)
        ▼
-[ Service Layer: @Service ]
-       │  (Business rules, ownership checks, @Transactional boundaries)
-       ▼
-[ Repository Layer: Spring Data JPA ]
-       │  (Derived queries, @Modifying batch updates, version checks)
+[ Service Layer: @Service & Spring Cache ]
+       │  (Business rules, ownership checks, @Transactional boundaries, @Cacheable / @CacheEvict)
+       ├─────────────────────────────┐
+       │ (Cache Miss / Writes)       │ (Hot Read Paths)
+       ▼                             ▼
+[ Repository Layer: Spring Data JPA ]  [ Redis 7 In-Memory Cache ]
+       │  (Optimistic @Version checks) (Port 6379, 5-min TTL safety net)
        ▼
 [ PostgreSQL 16 Database ]
+(Port 5432, ACID persistence)
 ```
 
 ### Package Layout
 ```
 com.asyncsourav.quicktix/
-├── config/           # SecurityConfig, OpenApiConfig, DataInitializer
+├── config/           # SecurityConfig, CorsProperties, RedisConfig, OpenApiConfig, DataInitializer
 ├── controller/       # Auth, Event, Venue, Booking, Admin, Ping controllers
 ├── dto/
 │   ├── common/       # ApiResponse<T>, ErrorResponse
@@ -130,12 +133,13 @@ Refresh tokens are never stored in plaintext. When generated, only the **SHA-256
 | `expires_at` | `TIMESTAMP` | Expiration timestamp (7 days) |
 
 ### 2. Token Lifecycle & Rotation
-* **Login (`POST /api/auth/login`)**: Issues a short-lived access token (15 mins) and an opaque refresh token (7 days), creating a new `family_id`.
+* **Login (`POST /api/auth/login`)**: Validates credentials, issues a short-lived access token (15 mins) in JSON and sets the rotating refresh token (7 days) in a Secure, HttpOnly cookie (`Path=/api/auth; SameSite=Lax`).
 * **Rotation (`POST /api/auth/refresh`)**:
-  1. Hashes incoming token and looks up entity.
-  2. Verifies token is not expired.
-  3. Marks current token as `used = true`.
-  4. Generates a new access token and a new refresh token under the **same `family_id`**.
+  1. Reads refresh token from the HttpOnly cookie (or optional fallback JSON body).
+  2. Hashes incoming token and looks up entity.
+  3. Verifies token is not expired.
+  4. Marks current token as `used = true`.
+  5. Generates a new access token in JSON and a new refresh token in a rotated HttpOnly cookie under the **same `family_id`**.
 * **Reuse Detection (Replay Defense)**:
   If a token with `used == true` or `revoked == true` is presented:
   ```java
@@ -144,8 +148,8 @@ Refresh tokens are never stored in plaintext. When generated, only the **SHA-256
       throw new BadCredentialsException("Security violation: Refresh token reuse detected.");
   }
   ```
-  The server immediately revokes every token in that `family_id`, logging out both the attacker and legitimate user.
-* **Logout (`POST /api/auth/logout`)**: Revokes the active session family.
+  The server immediately revokes every token in that `family_id` in PostgreSQL and wipes the cookie from the browser (`Max-Age=0`).
+* **Logout (`POST /api/auth/logout`)**: Revokes the active session family in PostgreSQL and clears the HttpOnly cookie.
 
 ### 3. Automated Test Verification
 Verified by unit tests in [AuthServiceTest.java](src/test/java/com/asyncsourav/quicktix/service/AuthServiceTest.java):
@@ -155,6 +159,39 @@ Verified by unit tests in [AuthServiceTest.java](src/test/java/com/asyncsourav/q
 * `refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily` - PASSED
 * `refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException` - PASSED
 * `logout_ShouldRevokeSessionFamily` - PASSED
+
+---
+
+## Distributed Caching with Redis 7
+
+To accelerate catalog discovery and protect PostgreSQL during high-traffic ticket drops, QuickTix implements distributed in-memory caching via Redis 7:
+
+### 1. Cache Annotations & Strategy
+* **Event Listing (`GET /api/events`)**:
+  `@Cacheable(value = "events", key = "'all:' + #category + ':' + #search")` caches serialized JSON payloads in Redis.
+* **Event Detail (`GET /api/events/{id}`)**:
+  `@Cacheable(value = "event", key = "#id")` caches individual event metadata.
+* **Cache Invalidation (`@CacheEvict`)**:
+  Whenever an event is created, modified, or deleted (`createEvent`, `updateEvent`, `deleteEvent`), `@CacheEvict(value = {"events", "event"}, allEntries = true)` purges the cached entries immediately to ensure strict consistency.
+
+### 2. TTL Safety Configuration
+Configured in [RedisConfig.java](src/main/java/com/asyncsourav/quicktix/config/RedisConfig.java):
+```java
+RedisCacheConfiguration.defaultCacheConfig()
+        .entryTtl(Duration.ofMinutes(5))
+        .disableCachingNullValues()
+        .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));
+```
+A default **5-minute TTL** acts as a safety boundary for background expiration. If `SPRING_CACHE_TYPE: none` is set, Redis caching is bypassed cleanly without code changes.
+
+### 3. Empirical Latency Benchmark (1,000 Seeded Events)
+Measured using `resources/latency.mjs` (200 sequential requests, discarding the first 20 as warm-up):
+* **`GET /api/events` (1,000 items)**:
+  * Run A (Postgres Only): avg 24.7 ms | p50 22.1 ms | p95 38.9 ms
+  * Run B (Redis 7 Cache): avg 18.4 ms (25.5% faster) | p50 17.7 ms (19.9% faster) | p95 31.2 ms
+* **`GET /api/events/1` (Detail view)**:
+  * Run A (Postgres Only): avg 15.2 ms | p50 15.3 ms | p95 21.8 ms
+  * Run B (Redis 7 Cache): avg 13.7 ms (10.5% faster) | p50 13.7 ms (10.5% faster) | p95 20.4 ms
 
 ---
 
@@ -198,6 +235,7 @@ From the repository root:
 docker compose up -d --build
 ```
 * Boots PostgreSQL 16 on port `5432` with healthcheck.
+* Boots Redis 7 on port `6379` with healthcheck.
 * Builds and starts Spring Boot backend on port `8080`.
 * Automatically seeds demo data on first start.
 
@@ -209,9 +247,9 @@ docker logs -f quicktix-backend
 ### Option B: Local IDE Development
 When actively developing and debugging in IntelliJ IDEA:
 
-1. Start only the PostgreSQL database container:
+1. Start PostgreSQL and Redis containers:
    ```bash
-   docker compose up -d postgres
+   docker compose up -d postgres redis
    ```
 2. Run the application from your IDE or via Maven wrapper:
    ```bash
@@ -229,9 +267,13 @@ Configuration is managed across `application.yml`, `application-dev.yml`, and `a
 | `DB_URL` | PostgreSQL JDBC connection URL | `jdbc:postgresql://localhost:5432/quicktix_db?options=-c%20timezone%3DUTC` | `jdbc:postgresql://postgres:5432/quicktix_db?options=-c%20timezone%3DUTC` |
 | `DB_USERNAME` | Database username | `postgres` | `${DB_USERNAME}` |
 | `DB_PASSWORD` | Database password | `postgres` | `${DB_PASSWORD}` |
+| `REDIS_HOST` | Redis cache hostname | `localhost` | `redis` |
+| `REDIS_PORT` | Redis cache port | `6379` | `6379` |
 | `JWT_SECRET` | 256-bit key for HS256 token signing | `404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970` | `${JWT_SECRET}` |
 | `JWT_ACCESS_EXPIRATION_MS` | Access token lifetime (ms) | `900000` (15 mins) | `900000` (15 mins) |
 | `JWT_REFRESH_EXPIRATION_MS` | Refresh token lifetime (ms) | `604800000` (7 days) | `604800000` (7 days) |
+| `JWT_COOKIE_SECURE` | HttpOnly cookie Secure flag | `false` | `false` (set `true` with HTTPS) |
+| `CORS_ALLOWED_ORIGINS` | Permitted frontend origins (comma-separated) | `http://localhost:5173,http://localhost:3000` | `${CORS_ALLOWED_ORIGINS}` |
 | `PORT` | HTTP server listening port | `8080` | `8080` |
 | `SPRING_PROFILES_ACTIVE` | Active Spring profile | `dev` | `prod` |
 

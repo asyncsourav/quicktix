@@ -13,10 +13,10 @@ The client provides an interactive seat selection experience, transparent sessio
 ## Architectural Principles
 
 1. **State Isolation**: State is organized into focused React Context providers:
-   * `AuthContext`: Authenticated user state, dual-token persistence in `localStorage`, role resolution, and login/logout lifecycles.
+   * `AuthContext`: In-memory access token state, user profile state, silent cookie-based session hydration on mount, and login/logout lifecycles. Zero credentials stored in `localStorage` to eliminate XSS token theft.
    * `ThemeContext`: Dark/Light theme state with CSS custom properties and persistence.
-2. **Silent Token Refresh Pipeline**: An [Axios](https://axios-http.com/) interceptor transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh`, and replays requests with the new access token without interrupting the user.
-3. **Declarative Route Guards**: Component-level route guards (`ProtectedRoute`, `RoleRoute`) prevent unauthorized navigation before views render.
+2. **Silent Token Refresh Pipeline**: An [Axios](https://axios-http.com/) interceptor transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh` with credentials (HttpOnly cookie), and replays requests with the new access token without interrupting the user.
+3. **Declarative Route Guards**: Component-level route guards (`ProtectedRoute`, `RoleRoute`) prevent unauthorized navigation before views render, gracefully handling session verification loading states.
 4. **Resilient Concurrency UI**: When a booking collision occurs (backend returns HTTP 409 Conflict), the UI catches the error, displays an informative alert to the user, and immediately refreshes the seat map without losing surrounding page state.
 5. **Zero CSS Framework Overhead**: Built with pure Vanilla CSS and design tokens (HSL variables) for fast layout calculations, custom dark/light theme transitions, and zero style bundle bloat.
 
@@ -49,8 +49,9 @@ The client provides an interactive seat selection experience, transparent sessio
 When an access token expires (15 minutes), the Axios interceptor in [client.js](src/api/client.js):
 1. Pauses outgoing API requests.
 2. If multiple requests fail simultaneously, queues them in an in-memory queue (`failedQueue`) so only **one** `/api/auth/refresh` request is dispatched.
-3. Once the refreshed access token and rotating refresh token arrive, updates `localStorage`, re-attaches headers, and replays all queued requests.
-4. If refresh fails or token reuse is detected, purges credentials and redirects to `/login`.
+3. Calls `POST /api/auth/refresh` with `withCredentials: true`, allowing the browser to automatically attach the Secure, HttpOnly refresh cookie.
+4. Once the refreshed access token arrives, updates in-memory authorization headers, and replays all queued requests seamlessly.
+5. If refresh fails or token reuse is detected, clears in-memory credentials and redirects to `/login`.
 
 ### 3. Role-Based Access Control (RBAC)
 * **Attendee (`USER`)**: Browse events, view seat availability, reserve seats, view and cancel personal bookings.
