@@ -195,6 +195,62 @@ Measured using `resources/latency.mjs` (200 sequential requests, discarding the 
 
 ---
 
+## Distributed Rate Limiting: Bucket4j + Redis
+
+To protect the booking endpoint (`POST /api/bookings`) against automated ticket-scalping bots during high-traffic ticket drops, QuickTix integrates **Bucket4j** backed by **Lettuce & Redis 7**:
+
+### 1. The Scalper Bot Threat & Domain Rationale
+During ticket drops, scalpers run parallelized scripts hitting the booking endpoint dozens of times per second. While PostgreSQL optimistic concurrency control (`@Version`) prevents duplicate bookings, thousands of rogue bot requests bombard the database with transaction rollbacks, depleting HikariCP connection pools and starving legitimate users. Rate limiting at the controller boundary throttles bot traffic before it touches database transactions.
+
+### 2. Dual-Layer Token Bucket Limits
+* **Per-User Limit**:
+  * **Capacity (Burst)**: 5 tokens
+  * **Refill Rate**: 1 token per second (`refillGreedy`)
+  * **Key**: `rate:booking:user:{username}`
+* **Per-IP Limit**:
+  * **Capacity (Burst)**: 10 tokens
+  * **Refill Rate**: 2 tokens per second (`refillGreedy`)
+  * **Key**: `rate:booking:ip:{clientIp}` (handles multi-account bot floods originating from a single IP/proxy)
+
+### 3. Fail-Open Architecture & Outage Resiliency
+* **Interview Insight**: *Rate limiting protects system capacity, but it is not what guarantees booking correctness. That is the job of PostgreSQL optimistic locking.*
+* If Redis experiences an outage or transient network partition, the rate limiter **fails open**:
+  ```java
+  ConsumptionProbe probe;
+  try {
+      probe = bucket.tryConsumeAndReturnRemaining(1);
+  } catch (Exception e) {
+      log.warn("Rate limiter unavailable, failing open: {}", e.toString());
+      return true; // allow request through to Postgres
+  }
+  if (!probe.isConsumed()) {
+      long wait = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
+      throw new RateLimitExceededException(wait);
+  }
+  return true;
+  ```
+* **Short Timeouts (200ms)**: Configured via `spring.data.redis.timeout: 200ms` and `spring.data.redis.connect-timeout: 200ms` to prevent slow Redis calls from stalling user threads.
+* **Cache Error Fallback ([CacheErrorConfig.java](src/main/java/com/asyncsourav/quicktix/config/CacheErrorConfig.java))**: Implements `CachingConfigurer.errorHandler()` so that if Redis is down, `@Cacheable` queries on `GET /api/events` transparently fall back to PostgreSQL instead of throwing HTTP 500.
+
+### 4. HTTP 429 Response Envelope
+When rate limits are exceeded, [GlobalExceptionHandler.java](src/main/java/com/asyncsourav/quicktix/exception/GlobalExceptionHandler.java) returns standard HTTP 429 with `Retry-After` headers:
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 3
+X-Rate-Limit-Retry-After-Seconds: 3
+Content-Type: application/json
+
+{
+  "timestamp": "2026-10-24T08:15:00.124",
+  "status": 429,
+  "error": "Too Many Requests",
+  "message": "Too many booking requests. Please wait 3 seconds before trying again.",
+  "path": "/api/bookings"
+}
+```
+
+---
+
 ## Production Multi-Stage Containerization
 
 The backend utilizes an optimized multi-stage [Dockerfile](Dockerfile):
