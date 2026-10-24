@@ -28,6 +28,8 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
 
+
+
     /**
      * 1. Handle Entity Not Found (404 NOT FOUND)
      */
@@ -53,6 +55,8 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.NOT_FOUND)
                 .body(errorResponse);
     }
+
+
 
 
     /**
@@ -82,6 +86,8 @@ public class GlobalExceptionHandler {
     }
 
 
+
+
     /**
      * 3. Handle Hibernate @Version Optimistic Locking Collisions (409 CONFLICT)
      */
@@ -107,6 +113,8 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.CONFLICT)
                 .body(errorResponse);
     }
+
+
 
     /**
      * 4. Handle Jakarta Bean Validation @Valid Failures (400 BAD REQUEST)
@@ -144,6 +152,8 @@ public class GlobalExceptionHandler {
                 .body(errorResponse);
     }
 
+
+
     /**
      * 5. Business logic validation failure (400 BAD REQUEST)
      */
@@ -171,6 +181,8 @@ public class GlobalExceptionHandler {
     }
 
 
+
+
     /**
      * 6. Role/authorization violation (403 FORBIDDEN)
      */
@@ -196,6 +208,8 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.FORBIDDEN)
                 .body(errorResponse);
     }
+
+
 
 
     /**
@@ -229,6 +243,8 @@ public class GlobalExceptionHandler {
     }
 
 
+
+
     /**
      * 8. Access/permission denied (403 FORBIDDEN)
      */
@@ -256,6 +272,8 @@ public class GlobalExceptionHandler {
     }
 
 
+
+
     /**
      * 9. Database constraint violation (409 CONFLICT)
      */
@@ -281,6 +299,8 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.CONFLICT)
                 .body(errorResponse);
     }
+
+
 
 
     /**
