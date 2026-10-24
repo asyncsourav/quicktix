@@ -6,7 +6,8 @@ QuickTix solves the high-concurrency ticket drop challenge: ensuring that when t
 
 **Live Demo:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)  
 **Interactive API Documentation:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
-**Architecture & Engineering Handbook:** [architecture/](architecture/README.md)
+**Architecture & Engineering Handbook:** [architecture/](architecture/README.md)  
+**Verification & Benchmark Scripts:** [scripts/](scripts/README.md)
 
 ---
 
@@ -95,6 +96,7 @@ Each core subsystem is documented in detail within the **[architecture/](archite
 * **[Security & Dual-Token Auth](architecture/security-and-auth.md)**: In-memory 15-minute access tokens, Secure HttpOnly 7-day refresh cookies, SHA-256 database token hashing, and session family reuse detection.
 * **[Production Containerization](architecture/containerization.md)**: Multi-stage Alpine Docker build achieving a 50.1% container size reduction (from 870 MB down to 434 MB).
 * **[Future Architectural Roadmap](architecture/future-roadmap.md)**: Blueprints for WebSocket live seat maps, centralized ELK logging, automated CI/CD, and k6 load testing.
+* **[Verification & Benchmark Scripts](scripts/README.md)**: Standalone test harnesses for concurrency collision testing (`race.mjs`), Redis latency benchmarking (`latency.mjs`), and cache invalidation verification (`check-eviction.mjs`).
 
 ---
 

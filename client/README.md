@@ -6,7 +6,7 @@ The client provides an interactive venue seat selection experience, transparent 
 
 **Live Deployment:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)  
 **Backend API Docs:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
-**Architecture Deep Dives:** [../docs/architecture/](../docs/architecture/README.md)
+**Architecture Deep Dives:** [../architecture/](../architecture/README.md)
 
 ---
 
