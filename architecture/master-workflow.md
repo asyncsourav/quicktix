@@ -1,12 +1,14 @@
-# End-to-End System Architecture & Request Lifecycle
+# Master Request Lifecycle & System Pipeline
 
-This document provides a clean, visual walkthrough of how I architected QuickTix's primary request workflows across the frontend, security filters, rate limiters, caching layers, business logic, and transactional database persistence.
+This document defines the high-level request pipeline for QuickTix, tracing how incoming HTTP requests traverse the security layer, input validation, distributed rate limiting, business services, distributed caching, and database concurrency controls.
+
+Detailed architectural specifications, code deep dives, and benchmark logs for each individual subsystem are organized in their respective dedicated documentation files.
 
 ---
 
 ## High-Level Request Pipeline
 
-I structured the platform around clear architectural boundaries so that cross-cutting concerns (security, anti-scalping limits, caching) are handled before requests reach heavy database transactions:
+I structured the platform around strict architectural boundaries. Each cross-cutting concern is evaluated in sequential stages before requests reach database persistence:
 
 ```
 [ Browser / Frontend Client ]
@@ -29,19 +31,26 @@ I structured the platform around clear architectural boundaries so that cross-cu
      └── Fail-Open Try/Catch Guard (Bypasses limiter if Redis is unavailable)
              │
              ▼
-[ 4. Service & Caching Layer ]
-     ├── Catalog Reads: Spring Cache (@Cacheable hot paths in Redis)
-     │     └── CacheErrorConfig (Falls back to PostgreSQL if Redis times out)
-     └── Writes / Bookings: @Transactional boundaries
+[ 4. Service Layer ]
+     ├── Business Logic Orchestration (@Transactional boundaries)
+     └── Ownership & Role Verification (User, Organizer, Admin)
              │
              ▼
-[ 5. Persistence & Concurrency Control ]
-     ├── Optimistic Locking: Hibernate @Version check on Seat
-     ├── PostgreSQL 16: ACID commit with unique constraints
-     └── Cache Invalidation: @CacheEvict purges stale catalog entries
+[ 5. Distributed Caching Layer (Redis 7) ]
+     ├── Cache Lookup (@Cacheable hot paths in Redis)
+     │     ├── Cache Hit: Return cached JSON immediately (< 20ms)
+     │     ├── Cache Miss: Proceed to database query
+     │     └── Cache Error: Fail-open fallback via CacheErrorConfig
+     └── Cache Eviction (@CacheEvict purges stale catalog keys on updates)
              │
              ▼
-[ 6. Response Dispatch ]
+[ 6. Persistence & Concurrency Control (PostgreSQL 16) ]
+     ├── Optimistic Locking: Hibernate @Version check on Seat (WHERE id=? AND version=?)
+     ├── ACID Commit: Commit booking or trigger atomic batch rollback on collision
+     └── Database Integrity: Relational foreign keys and unique constraints
+             │
+             ▼
+[ 7. Response Dispatch ]
      ├── HTTP 200 / 201: ApiResponse<T> JSON envelope
      ├── HTTP 409: Seat conflict (ObjectOptimisticLockingFailureException)
      └── HTTP 429: Rate limit exceeded (Retry-After header attached)
@@ -49,185 +58,89 @@ I structured the platform around clear architectural boundaries so that cross-cu
 
 ---
 
-## Workflow 1: Live Event Catalog & Distributed Caching (`GET /api/events`)
+## Workflow 1: Live Event Catalog Read Flow (`GET /api/events`)
 
-### Purpose
-Event browsing accounts for more than 90% of total application traffic. I designed this workflow to serve catalog requests directly from Redis memory in under 20ms while guaranteeing that a Redis outage never causes HTTP 500 errors.
+The high-level path for browsing and searching live events:
 
-### Visual Architecture
+```mermaid
+flowchart LR
+    Client([Client Browser]) --> Web[EventController]
+    Web --> Svc[EventService]
+    Svc --> Cache{Redis Cache}
+    Cache -->|Hit| FastRet([HTTP 200 ~18ms])
+    Cache -->|Miss / Outage| DB[(PostgreSQL 16)]
+    DB --> CacheSave[Save to Redis]
+    CacheSave --> Ret([HTTP 200 OK])
+```
+
+1. **Client Request:** The attendee requests the catalog with optional search or category filters.
+2. **Security & Web Layer:** Public endpoint (`permitAll`), validates query parameters.
+3. **Service Layer:** `EventService.getAllEvents()` is invoked.
+4. **Caching Layer:** Checks Redis using composite key `events::all:{category}:{search}`:
+   * **Cache Hit:** Returns serialized JSON in under 20ms, completely bypassing PostgreSQL.
+   * **Cache Miss:** Queries PostgreSQL, stores the result in Redis with a 5-minute TTL, and returns HTTP 200.
+   * **Redis Outage:** `CacheErrorConfig` intercepts the timeout, treats it as a miss, and falls back directly to PostgreSQL with zero downtime.
+
+> **Dedicated Deep Dive:** For complete cache configuration, TTL invalidation, the `CacheErrorConfig` outage fix, and 200-run latency benchmarks, see **[Distributed Caching Architecture](distributed-caching.md)**.
+
+---
+
+## Workflow 2: Ticket Booking & Concurrency Flow (`POST /api/bookings`)
+
+The high-level path for reserving seats under concurrent traffic:
+
+```mermaid
+flowchart LR
+    Client([Attendee / Bot]) --> Sec[JwtAuthFilter]
+    Sec --> Ctrl[BookingController]
+    Ctrl --> Limiter{Bucket4j Rate Limiter}
+    Limiter -->|Exceeded| Throttled([HTTP 429 Too Many Requests])
+    Limiter -->|Passed / Fail-Open| Svc[BookingService]
+    Svc --> DB[(PostgreSQL @Version)]
+    DB -->|Version Match| Confirmed([HTTP 201 Booking Confirmed])
+    DB -->|Version Collision| Conflict([HTTP 409 Seat Conflict])
+```
+
+1. **Authentication:** `JwtAuthFilter` validates the in-memory Bearer access token and extracts the authenticated user.
+2. **Rate Limiting Edge Filter:** `RateLimiterService` checks Redis token buckets (IP burst 10, User burst 5):
+   * If capacity is exceeded: Throws `RateLimitExceededException` -> returns HTTP 429 with `Retry-After`.
+   * If Redis is down: Fails open within 200ms and allows the request through to PostgreSQL.
+3. **Transactional Booking Execution:** `BookingService` executes inside `@Transactional`.
+4. **Optimistic Locking Verification:** Hibernate issues `UPDATE seats ... WHERE id = ? AND version = ?`:
+   * **Winner Thread:** 1 row updated -> version increments -> booking created -> HTTP 201 Created.
+   * **Loser Thread:** 0 rows updated -> `ObjectOptimisticLockingFailureException` -> atomic batch rollback -> HTTP 409 Conflict.
+
+> **Dedicated Deep Dives:**
+> * For anti-scalping bot models, Bucket4j token bucket algorithms, and fail-open design, see **[Distributed Rate Limiting](distributed-rate-limiting.md)**.
+> * For optimistic locking SQL predicates, atomic batch rollbacks, and `race.mjs` test verification, see **[Concurrency Control & Double-Booking Prevention](concurrency-control.md)**.
+
+---
+
+## Workflow 3: Dual-Token Authentication & Rotation Flow (`/api/auth/*`)
+
+The high-level path for session issuance, silent rotation, and replay attack defense:
 
 ```mermaid
 flowchart TD
-    Client([Attendee Browser]) -->|GET /api/events| Controller[EventController]
-    Controller --> Service[EventService.getAllEvents]
-    
-    Service --> CacheCheck{Is Data in Redis?}
-    
-    CacheCheck -->|Cache Hit| RedisServe[Read Serialized JSON from Redis]
-    RedisServe --> FastResponse([HTTP 200 OK - ~18ms])
-    
-    CacheCheck -->|Cache Miss| DBQuery[Query PostgreSQL]
-    DBQuery --> RedisSave[Store in Redis - TTL: 5 min]
-    RedisSave --> DBResponse([HTTP 200 OK - From DB])
-    
-    CacheCheck -->|Redis Down / Timeout| Fallback[CacheErrorConfig Intercepts Error]
-    Fallback --> DirectDB[Query PostgreSQL Directly]
-    DirectDB --> FallbackResponse([HTTP 200 OK - Zero Downtime])
-```
+    subgraph Login [1. Login Phase]
+        AuthReq([POST /api/auth/login]) --> AuthCtrl[AuthController]
+        AuthCtrl --> GenTokens[Generate Access Token + Refresh Token]
+        GenTokens --> SaveHash[(Save SHA-256 Hash + family_id in DB)]
+        SaveHash --> AuthResp([Return Access Token in Memory + HttpOnly Cookie])
+    end
 
-### The 3 Execution Scenarios
-
-1. **Cache Hit (The Fast Path):**
-   * The client requests the catalog with optional search or category parameters.
-   * `EventService` looks up the composite key `events::all:{category}:{search}` in Redis 7.
-   * Redis returns the cached JSON in **~18ms**, completely bypassing PostgreSQL.
-
-2. **Cache Miss (First Request or Expired TTL):**
-   * If the key does not exist in Redis, the service queries PostgreSQL.
-   * Spring Cache stores the result in Redis with a 5-minute time-to-live (`Duration.ofMinutes(5)`).
-   * Returns **HTTP 200 OK** to the client.
-
-3. **Redis Outage (Fail-Open Resilience):**
-   * If Redis crashes or experiences network partitions, Spring Cache would normally throw an unhandled `QueryTimeoutException` (HTTP 500).
-   * My [`CacheErrorConfig.java`](../server/src/main/java/com/asyncsourav/quicktix/config/CacheErrorConfig.java) intercepts the error, logs a warning, and treats it as a simple cache miss.
-   * The application queries PostgreSQL directly, returning **HTTP 200 OK** with zero downtime for attendees.
-
----
-
-## Workflow 2: Ticket Booking & Concurrency Control (`POST /api/bookings`)
-
-### Purpose
-The booking reservation endpoint is the most mission-critical pipeline in QuickTix. It protects the platform against two distinct failure modes:
-1. **Edge Abuse:** Automated scalper bots exhausting database connection pool threads with parallel spam.
-2. **Database Over-Selling:** Multiple concurrent attendees attempting to book the exact same seat simultaneously.
-
-I designed this workflow as a two-stage pipeline:
-
----
-
-### Stage A: Anti-Scalping Edge Limiter (Bucket4j + Redis)
-
-Before any database connection is opened, the request must pass through my dual-tier distributed rate limiter:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as User / Bot
-    participant Ctrl as BookingController
-    participant Limiter as RateLimiterService
-    participant Redis as Redis 7 (Token Bucket)
-
-    Client->>Ctrl: POST /api/bookings { eventId: 1, seatIds: [10] }
-    Ctrl->>Limiter: checkBookingRateLimit(username, clientIp)
-    Limiter->>Redis: Try consume 1 token (IP bucket & User bucket)
-
-    alt Scenario 1: Tokens Available
-        Redis-->>Limiter: Tokens consumed (Remaining: N)
-        Limiter-->>Ctrl: Allow request to proceed to BookingService
-    else Scenario 2: Limit Exceeded (Throttled)
-        Redis-->>Limiter: Tokens exhausted (Refill wait: X sec)
-        Limiter-->>Client: HTTP 429 Too Many Requests (Retry-After: X)
-    else Scenario 3: Redis Down (Fail-Open)
-        Redis-->>Limiter: Timeout (200ms socket timeout)
-        Note over Limiter: Catches timeout, logs warning, and fails open
-        Limiter-->>Ctrl: Allow request through to PostgreSQL
+    subgraph Refresh [2. Silent Refresh Phase]
+        RefReq([POST /api/auth/refresh]) --> CheckClaim{Atomic Claim in DB}
+        CheckClaim -->|used == false| Rotate[Burn Token + Issue Rotated Pair]
+        Rotate --> RefResp([Return New Access Token + New Cookie])
+        CheckClaim -->|used == true| Trap[SECURITY ALERT: Replay Detected!]
+        Trap --> Revoke[(Revoke Entire Token Family in DB)]
+        Revoke --> Wipe([HTTP 401 Unauthorized + Cookie Wiped])
     end
 ```
 
-* **Per-IP Limit:** Capacity 10 tokens, refill 2 tokens/sec (blocks unauthenticated bot clusters).
-* **Per-User Limit:** Capacity 5 tokens, refill 1 token/sec (blocks authenticated single-account automation scripts).
-* **Fail-Open Design:** If Redis fails, the limiter allows requests through because PostgreSQL optimistic locking guarantees business correctness.
+1. **Login & Issuance:** User authenticates. The server returns a 15-minute access token in JSON (stored in memory) and sets a 7-day refresh token in a Secure, `HttpOnly` cookie. Only the SHA-256 hash is saved in PostgreSQL under a unique `family_id`.
+2. **Silent Rotation:** When the access token expires, the client's Axios interceptor automatically posts the cookie. The database executes an atomic claim (`UPDATE refresh_tokens SET used = true WHERE id = ? AND used = false`). A new token pair is issued under the same family.
+3. **Replay Detection:** If an attacker presents an already-used token, the system detects `used == true`. Using `@Transactional(noRollbackFor = BadCredentialsException.class)`, it immediately commits a revocation of the entire token family in PostgreSQL, wipes the cookie, and aborts the session.
 
----
-
-### Stage B: Concurrency Control in PostgreSQL (Optimistic Locking)
-
-Once the request clears the rate limiter, [`BookingService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/BookingService.java) executes inside a Spring `@Transactional` boundary.
-
-Here is what happens when **User A (Winner)** and **User B (Loser)** attempt to reserve the same seat (`id = 10, version = 1`) at the exact same millisecond:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Svc as BookingService
-    participant DB as PostgreSQL 16
-    participant Ex as GlobalExceptionHandler
-    actor Winner as User A (Winner)
-    actor Loser as User B (Loser)
-
-    Note over Svc,DB: Both users read Seat #10 concurrently (Status: AVAILABLE, Version: 1)
-
-    Note over Svc,DB: Phase 1: Winner Transaction Commits
-    Svc->>DB: UPDATE seats SET status='BOOKED', version=2 WHERE id=10 AND version=1
-    DB-->>Svc: 1 row affected (Version becomes 2)
-    Svc->>DB: INSERT INTO bookings ...
-    Svc->>DB: COMMIT Transaction
-    Svc-->>Winner: HTTP 201 Created (Booking Confirmed)
-
-    Note over Svc,DB: Phase 2: Loser Transaction Commits (Collision Detected)
-    Svc->>DB: UPDATE seats SET status='BOOKED', version=2 WHERE id=10 AND version=1
-    DB-->>Svc: 0 rows affected (Version is already 2!)
-    Note over Svc: Hibernate throws ObjectOptimisticLockingFailureException
-    Svc->>DB: ROLLBACK Transaction (Atomic batch rollback)
-    Svc-->>Ex: Forward exception
-    Ex-->>Loser: HTTP 409 Conflict ("Seat was just booked by another user")
-```
-
-* **Why Zero Double-Bookings Occur:** The database update requires `WHERE version = 1`. Because User A's commit incremented the version to `2`, User B's update affects `0` rows.
-* **Atomic Batch Safety:** If an attendee reserves multiple seats (e.g. Seats 10, 11, 12) and even one seat experiences a collision, the entire transaction rolls back atomically. Zero partial reservations are ever saved.
-
----
-
-## Workflow 3: Dual-Token Auth, Silent Rotation & Replay Defense (`/api/auth/*`)
-
-### Purpose
-To provide seamless authentication for human users while eliminating XSS credential theft and automatically neutralizing stolen refresh tokens.
-
-### Token Strategy
-* **Access Token:** 15-minute lifespan, stored only in frontend memory (never in `localStorage`).
-* **Refresh Token:** 7-day lifespan, sent in a Secure, `HttpOnly` cookie inaccessible to JavaScript.
-* **Database Session:** SHA-256 token hash tracked in PostgreSQL with a unique `family_id`.
-
----
-
-### Silent Rotation vs Replay Attack Defense
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Client as User / Attacker
-    participant Ctrl as AuthController
-    participant Svc as AuthService
-    participant DB as PostgreSQL (refresh_tokens)
-
-    Client->>Ctrl: POST /api/auth/refresh (HttpOnly Cookie)
-    Ctrl->>Svc: refresh(cookieToken)
-    Svc->>DB: Lookup token by SHA-256 hash
-
-    alt Scenario 1: Normal Silent Rotation (used == false)
-        Svc->>DB: Atomic claim: UPDATE refresh_tokens SET used=true WHERE id=? AND used=false
-        Svc->>DB: Store new rotated token hash (same family UUID)
-        Svc-->>Client: HTTP 200 OK (New Access Token + Rotated HttpOnly Cookie)
-    else Scenario 2: Token Replay Detected (used == true)
-        Note over Svc: SECURITY ALERT: Stolen token replayed!
-        Svc->>DB: Revoke entire family: UPDATE refresh_tokens SET revoked=true WHERE family_id=?
-        Svc-->>Client: HTTP 401 Unauthorized (Cookie wiped with Max-Age=0)
-    end
-```
-
-### Key Engineering Defenses
-
-1. **Atomic Token Claiming:**
-   I wrote the claim statement as a single atomic SQL query in [`RefreshTokenRepository.java`](../server/src/main/java/com/asyncsourav/quicktix/repository/RefreshTokenRepository.java):
-   ```sql
-   UPDATE refresh_tokens SET used = true WHERE id = :id AND used = false AND revoked = false;
-   ```
-   If two parallel requests hit `/api/auth/refresh` at the same time, only one can update the row. The other receives 0 rows affected and fails instantly, preventing split session families.
-
-2. **Commit on Reuse Detection (`noRollbackFor`):**
-   In [`AuthService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/AuthService.java), I configured:
-   ```java
-   @Transactional(noRollbackFor = BadCredentialsException.class)
-   public AuthResponse refresh(String incomingToken, HttpServletResponse response) { ... }
-   ```
-   This ensures that when token reuse is detected, the family revocation is committed to PostgreSQL before the HTTP 401 exception is thrown, guaranteeing that the stolen session family is permanently terminated.
+> **Dedicated Deep Dive:** For complete token lifecycle analysis, XSS defenses, the transaction rollback bug fix, and atomic claim queries, see **[Security & Dual-Token Authentication](security-and-auth.md)**.
