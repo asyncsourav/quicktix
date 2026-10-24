@@ -7,6 +7,7 @@ import com.asyncsourav.quicktix.dto.common.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -304,7 +305,38 @@ public class GlobalExceptionHandler {
 
 
     /**
-     * 10. Unexpected/unhandled exception (500 INTERNAL SERVER ERROR)
+     * 10. Handle Rate Limiting (429 TOO MANY REQUESTS)
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
+            RateLimitExceededException ex,
+            HttpServletRequest request) {
+
+        log.warn(
+                "Rate limit exceeded for URI: {} | Retry after: {}s",
+                request.getRequestURI(),
+                ex.getRetryAfterSeconds()
+        );
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .header("X-Rate-Limit-Retry-After-Seconds", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(errorResponse);
+    }
+
+
+
+
+    /**
+     * 11. Unexpected/unhandled exception (500 INTERNAL SERVER ERROR)
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(
