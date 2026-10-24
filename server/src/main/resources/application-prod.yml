@@ -21,6 +21,8 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
+      timeout: ${REDIS_TIMEOUT:200ms}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:200ms}
 
 jwt:
   secret: ${JWT_SECRET}

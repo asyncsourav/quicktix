@@ -6,6 +6,10 @@ spring:
     name: quicktix
   cache:
     type: redis
+  data:
+    redis:
+      timeout: 200ms
+      connect-timeout: 200ms
 
 # Centralized CORS Configuration (supports comma-separated list or yaml lists and env var CORS_ALLOWED_ORIGINS)
 cors:
