@@ -1,24 +1,24 @@
 # QuickTix Client
 
-The Single Page Application (SPA) frontend for [QuickTix](../README.md), built with [React 19](https://react.dev/), [Vite](https://vitejs.dev/), and [React Router 6](https://reactrouter.com/).
+The Single Page Application (SPA) frontend for [QuickTix](../README.md), built with [React 19](https://react.dev/), [Vite 6](https://vitejs.dev/), and [React Router 6](https://reactrouter.com/).
 
-The client provides an interactive seat selection experience, transparent session management with silent token refresh, and role-based views for Attendees, Organizers, and Administrators.
+The client provides an interactive venue seat selection experience, transparent session management with silent token refresh, and role-based views for Attendees, Organizers, and Administrators.
 
-**Live Deployment:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)
-
-<!-- SCREENSHOT: QuickTix Client Interactive Event Detail Page with Seat Grid Picker and Checkout Sidebar -->
+**Live Deployment:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)  
+**Backend API Docs:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
+**Architecture Deep Dives:** [../docs/architecture/](../docs/architecture/README.md)
 
 ---
 
-## Architectural Principles
+## Architectural Highlights
 
-1. **State Isolation**: State is organized into focused React Context providers:
-   * `AuthContext`: In-memory access token state, user profile state, silent cookie-based session hydration on mount, and login/logout lifecycles. Zero credentials stored in `localStorage` to eliminate XSS token theft.
-   * `ThemeContext`: Dark/Light theme state with CSS custom properties and persistence.
-2. **Silent Token Refresh Pipeline**: An [Axios](https://axios-http.com/) interceptor transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh` with credentials (HttpOnly cookie), and replays requests with the new access token without interrupting the user.
-3. **Declarative Route Guards**: Component-level route guards (`ProtectedRoute`, `RoleRoute`) prevent unauthorized navigation before views render, gracefully handling session verification loading states.
-4. **Resilient Concurrency UI**: When a booking collision occurs (backend returns HTTP 409 Conflict), the UI catches the error, displays an informative alert to the user, and immediately refreshes the seat map without losing surrounding page state.
-5. **Zero CSS Framework Overhead**: Built with pure Vanilla CSS and design tokens (HSL variables) for fast layout calculations, custom dark/light theme transitions, and zero style bundle bloat.
+* **State Isolation**: State is organized into focused React Context providers:
+  * `AuthContext`: In-memory access token storage, user profile state, silent cookie-based session hydration on mount, and login/logout lifecycles. Zero credentials stored in `localStorage` to eliminate XSS token theft.
+  * `ThemeContext`: Dark/Light theme state with CSS custom properties and persistence.
+* **Silent Token Refresh Pipeline**: An [Axios](https://axios-http.com/) interceptor transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh` with credentials (HttpOnly cookie), and replays requests with the new access token without interrupting the user.
+* **Declarative Route Guards**: Component-level route guards (`ProtectedRoute`) prevent unauthorized navigation before views render, gracefully handling session verification loading states.
+* **Resilient Concurrency UI**: When a booking collision occurs (backend returns HTTP 409 Conflict), the UI catches the error, displays an informative alert to the user, and immediately refreshes the seat map without losing surrounding page state.
+* **Zero CSS Framework Overhead**: Built with pure Vanilla CSS and design tokens (custom CSS variables) for fast layout calculations, custom dark/light theme transitions, and zero style bundle bloat.
 
 ---
 
@@ -30,7 +30,7 @@ The client provides an interactive seat selection experience, transparent sessio
 * **HTTP Client:** [Axios 1.7](https://axios-http.com/)
 * **Icons:** [lucide-react](https://lucide.dev/)
 * **Styling System:** Vanilla CSS 3 with Custom Property Design Tokens
-* **Typography:** [Inter](https://fonts.google.com/specimen/Inter) and [Outfit](https://fonts.google.com/specimen/Outfit) via Google Fonts
+* **Typography:** Plus Jakarta Sans & JetBrains Mono via Google Fonts
 * **Hosting & CDN:** [Vercel](https://vercel.com/) (Edge network with SPA client rewrites)
 
 ---
@@ -49,44 +49,24 @@ The client provides an interactive seat selection experience, transparent sessio
 * **Live Price Calculation**: Calculates itemized pricing and subtotal dynamically as seats are toggled.
 * **Atomic Multi-Seat Submission**: Submits batch seat selections to `POST /api/bookings` in a single transactional payload.
 
-<!-- SCREENSHOT: Seat Selection Grid showcasing Available, Selected, and Booked seat states alongside the order summary -->
-
-### 2. Silent Token Refresh with Request Queueing
-When an access token expires (15 minutes), the Axios interceptor in [client.js](src/api/client.js):
-1. Pauses outgoing API requests.
-2. If multiple requests fail simultaneously, queues them in an in-memory queue (`failedQueue`) so only **one** `/api/auth/refresh` request is dispatched.
-3. Calls `POST /api/auth/refresh` with `withCredentials: true`, allowing the browser to automatically attach the Secure, HttpOnly refresh cookie.
-4. Once the refreshed access token arrives, updates in-memory authorization headers, and replays all queued requests seamlessly.
-5. If refresh fails or token reuse is detected, clears in-memory credentials and redirects to `/login`.
-
 ### 3. Role-Based Access Control (RBAC)
 * **Attendee (`USER`)**: Browse events, view seat availability, reserve seats, view and cancel personal bookings.
 * **Organizer (`ORGANIZER`)**: All attendee capabilities plus venue creation, event publication, and seat inventory generation.
 * **Administrator (`ADMIN`)**: Full platform oversight including user directories, platform revenue statistics, and booking ledgers.
 
-<!-- SCREENSHOT: Admin Dashboard showcasing aggregate metrics, registered users table, and booking management view -->
-
-### 4. One-Click Demo Mode
-The sign-in interface includes pre-configured one-click demo login buttons for reviewers:
-* Attendee (`user@quicktix.com`)
-* Organizer (`organizer@quicktix.com`)
-* Administrator (`admin@quicktix.com`)
-
-<!-- SCREENSHOT: Login page with 1-click quick login buttons for Attendee, Organizer, and Admin -->
-
 ---
 
 ## Routing & Page Registry
 
-| Path | View Component | Access Tier | API Interactions |
+| Path | View Component | Access Tier | Primary Interactions |
 | :--- | :--- | :---: | :--- |
-| `/` | `HomePage` | Public | `GET /api/events` |
-| `/events/:id` | `EventDetailPage` | Public | `GET /api/events/{id}`, `GET /api/events/{id}/seats`, `POST /api/bookings` |
-| `/login` | `LoginPage` | Guest | `POST /api/auth/login` |
-| `/register` | `RegisterPage` | Guest | `POST /api/auth/register` |
-| `/my-bookings` | `MyBookingsPage` | Authenticated | `GET /api/bookings/me`, `DELETE /api/bookings/{id}` |
-| `/organizer/create` | `CreateEventPage` | `ORGANIZER`, `ADMIN` | `GET /api/venues`, `POST /api/venues`, `POST /api/events` |
-| `/admin` | `AdminDashboard` | `ADMIN` | `GET /api/admin/stats`, `GET /api/admin/users`, `GET /api/admin/bookings` |
+| `/` | `HomePage` | Public | Live landing page, hero metrics, event catalog search |
+| `/events/:id` | `EventDetailPage` | Public | Interactive seat map, seat selection, checkout |
+| `/login` | `LoginPage` | Guest | Login form with 1-click demo role access |
+| `/register` | `RegisterPage` | Guest | Account registration |
+| `/my-bookings` | `MyBookingsPage` | Authenticated | View confirmed bookings, ticket cancellation |
+| `/organizer/create` | `CreateEventPage` | `ORGANIZER`, `ADMIN` | Venue selection, event details, seat map generator |
+| `/admin` | `AdminDashboard` | `ADMIN` | Platform metrics, user directories, booking audits |
 
 ---
 
@@ -140,11 +120,6 @@ Single Page Applications require routing rewrites so that deep links resolve to 
   ]
 }
 ```
-
-In the Vercel dashboard:
-1. Set Framework Preset to **Vite**.
-2. Set Root Directory to **`client`**.
-3. Set Environment Variable: `VITE_API_BASE_URL=https://<your-backend-domain>/api`.
 
 ---
 
