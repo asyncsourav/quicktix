@@ -2,7 +2,7 @@
 
 A high-performance, concurrency-safe distributed live event ticketing and seat reservation platform built with [Java 25](https://openjdk.org/projects/jdk/25/), [Spring Boot 4](https://spring.io/projects/spring-boot), [PostgreSQL 16](https://www.postgresql.org/), [Redis 7](https://redis.io/), [Docker](https://www.docker.com/), and [React 19](https://react.dev/).
 
-QuickTix solves the high-concurrency ticket drop challenge: ensuring that when thousands of users attempt to reserve the exact same seats simultaneously, the system guarantees strict ACID consistency, sub-20ms catalog reads, and zero double-bookings without deadlocking database threads.
+I built QuickTix to solve the high-concurrency ticket drop challenge: ensuring that when thousands of users attempt to reserve the exact same seats simultaneously, the system guarantees strict ACID consistency, sub-20ms catalog reads, and zero double-bookings without deadlocking database threads.
 
 **Live Demo:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)  
 **Interactive API Documentation:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
@@ -87,7 +87,7 @@ erDiagram
 
 ## Engineering Highlights & Technical Deep Dives
 
-Each core subsystem is documented in detail within the **[architecture/](architecture/README.md)** directory:
+I documented each core subsystem in detail within the **[architecture/](architecture/README.md)** handbook:
 
 * **[End-to-End Request Lifecycle](architecture/master-workflow.md)**: Full trace of requests from frontend click to database commit, with sequence diagrams for all primary lifecycles and failure mode resilience analysis.
 * **[Concurrency Control & Optimistic Locking](architecture/concurrency-control.md)**: Hibernate `@Version` collision prevention, predicate-based SQL updates, and atomic batch rollbacks guaranteeing zero double-bookings.

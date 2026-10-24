@@ -1,8 +1,8 @@
 # QuickTix Server
 
-The backend REST API service for [QuickTix](../README.md), built with [Java 25](https://openjdk.org/projects/jdk/25/) and [Spring Boot 4.0](https://spring.io/projects/spring-boot).
+I built the backend REST API service for [QuickTix](../README.md) using [Java 25](https://openjdk.org/projects/jdk/25/) and [Spring Boot 4.0](https://spring.io/projects/spring-boot).
 
-The service handles authentication, venue administration, event publishing, automatic seat inventory generation, and transactional seat bookings with optimistic locking concurrency controls to guarantee that seats can never be double-booked.
+I designed the platform to handle authentication, venue administration, event publishing, automatic seat inventory generation, and transactional seat bookings with optimistic locking concurrency controls to guarantee that seats can never be double-booked.
 
 **Interactive API Documentation (Swagger UI):** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
 **OpenAPI Specification:** [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)  
@@ -11,13 +11,13 @@ The service handles authentication, venue administration, event publishing, auto
 
 ---
 
-## Architectural Highlights
+## Key Architectural Systems I Built
 
-* **Optimistic Concurrency Control**: Hibernate `@Version` collision handling on each seat entity guarantees zero double-bookings under concurrent ticket spikes. (See [Concurrency Control Deep Dive](../architecture/concurrency-control.md))
-* **Distributed In-Memory Caching**: Hot read paths (`GET /api/events`) are cached in Redis 7 with a 5-minute TTL and automated `@CacheEvict` invalidation. Fail-open error handling via [`CacheErrorConfig.java`](src/main/java/com/asyncsourav/quicktix/config/CacheErrorConfig.java) ensures catalog reads fall back to PostgreSQL if Redis times out. (See [Distributed Caching Deep Dive](../architecture/distributed-caching.md))
-* **Anti-Scalping Distributed Rate Limiting**: Bucket4j + Lettuce token bucket rate limiting on `POST /api/bookings` enforces per-user (burst 5) and per-IP (burst 10) limits with short 200ms timeouts and fail-open resilience. (See [Rate Limiting Deep Dive](../architecture/distributed-rate-limiting.md))
-* **Dual-Token Authentication**: Stateless 15-minute access tokens in memory paired with 7-day rotating refresh tokens in Secure, HttpOnly cookies. Full database tracking with SHA-256 token hashes detects replay attacks and revokes compromised token families. (See [Security Architecture Deep Dive](../architecture/security-and-auth.md))
-* **Multi-Stage Containerization**: 50.1% smaller production image (from 870 MB down to 434 MB) using Eclipse Temurin JRE 25 on Alpine Linux. (See [Containerization Deep Dive](../architecture/containerization.md))
+* **Optimistic Concurrency Control**: I implemented Hibernate `@Version` collision handling on each seat entity to guarantee zero double-bookings under concurrent ticket spikes. (See [Concurrency Control Deep Dive](../architecture/concurrency-control.md))
+* **Distributed In-Memory Caching**: I cached hot read paths (`GET /api/events`) in Redis 7 with a 5-minute TTL and automated `@CacheEvict` invalidation. I built fail-open error handling via [`CacheErrorConfig.java`](src/main/java/com/asyncsourav/quicktix/config/CacheErrorConfig.java) to ensure catalog reads fall back to PostgreSQL if Redis times out. (See [Distributed Caching Deep Dive](../architecture/distributed-caching.md))
+* **Anti-Scalping Distributed Rate Limiting**: I built Bucket4j + Lettuce token bucket rate limiting on `POST /api/bookings` enforcing per-user (burst 5) and per-IP (burst 10) limits with short 200ms timeouts and fail-open resilience. (See [Rate Limiting Deep Dive](../architecture/distributed-rate-limiting.md))
+* **Dual-Token Authentication**: I designed stateless 15-minute access tokens in memory paired with 7-day rotating refresh tokens in Secure, HttpOnly cookies. Full database tracking with SHA-256 token hashes detects replay attacks and revokes compromised token families. (See [Security Architecture Deep Dive](../architecture/security-and-auth.md))
+* **Multi-Stage Containerization**: I cut the production container size by 50.1% (from 870 MB down to 434 MB) using a multi-stage Docker build with Eclipse Temurin JRE 25 on Alpine Linux. (See [Containerization Deep Dive](../architecture/containerization.md))
 
 ---
 

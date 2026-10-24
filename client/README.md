@@ -1,8 +1,8 @@
 # QuickTix Client
 
-The Single Page Application (SPA) frontend for [QuickTix](../README.md), built with [React 19](https://react.dev/), [Vite 6](https://vitejs.dev/), and [React Router 6](https://reactrouter.com/).
+I built the Single Page Application (SPA) frontend for [QuickTix](../README.md) using [React 19](https://react.dev/), [Vite 6](https://vitejs.dev/), and [React Router 6](https://reactrouter.com/).
 
-The client provides an interactive venue seat selection experience, transparent session management with silent token refresh, and role-based views for Attendees, Organizers, and Administrators.
+I designed the client to provide an interactive venue seat selection experience, transparent session management with silent token refresh, and role-based views for Attendees, Organizers, and Administrators.
 
 **Live Deployment:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)  
 **Backend API Docs:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
@@ -10,15 +10,15 @@ The client provides an interactive venue seat selection experience, transparent 
 
 ---
 
-## Architectural Highlights
+## Key Frontend Architectural Systems I Built
 
-* **State Isolation**: State is organized into focused React Context providers:
-  * `AuthContext`: In-memory access token storage, user profile state, silent cookie-based session hydration on mount, and login/logout lifecycles. Zero credentials stored in `localStorage` to eliminate XSS token theft.
+* **State Isolation**: I structured state into focused React Context providers:
+  * `AuthContext`: In-memory access token storage, user profile state, silent cookie-based session hydration on mount, and login/logout lifecycles. I stored zero credentials in `localStorage` to completely eliminate XSS token theft.
   * `ThemeContext`: Dark/Light theme state with CSS custom properties and persistence.
-* **Silent Token Refresh Pipeline**: An [Axios](https://axios-http.com/) interceptor transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh` with credentials (HttpOnly cookie), and replays requests with the new access token without interrupting the user.
-* **Declarative Route Guards**: Component-level route guards (`ProtectedRoute`) prevent unauthorized navigation before views render, gracefully handling session verification loading states.
-* **Resilient Concurrency UI**: When a booking collision occurs (backend returns HTTP 409 Conflict), the UI catches the error, displays an informative alert to the user, and immediately refreshes the seat map without losing surrounding page state.
-* **Zero CSS Framework Overhead**: Built with pure Vanilla CSS and design tokens (custom CSS variables) for fast layout calculations, custom dark/light theme transitions, and zero style bundle bloat.
+* **Silent Token Refresh Pipeline**: I engineered an [Axios](https://axios-http.com/) interceptor that transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh` with credentials (HttpOnly cookie), and replays pending requests with the new access token without interrupting the user.
+* **Declarative Route Guards**: I created component-level route guards (`ProtectedRoute`) that prevent unauthorized navigation before views render, gracefully handling session verification loading states.
+* **Resilient Concurrency UI**: When a booking collision occurs (backend returns HTTP 409 Conflict), I catch the error, display an informative alert to the user, and immediately trigger a seat map refresh without resetting other page state.
+* **Zero CSS Framework Overhead**: I built the entire UI with pure Vanilla CSS and custom property design tokens for fast layout calculations, custom dark/light theme transitions, and zero style bundle bloat.
 
 ---
 

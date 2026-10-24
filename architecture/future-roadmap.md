@@ -1,12 +1,12 @@
-# Future Architectural Extensions & Roadmap
+# My Engineering Roadmap & Future Architectural Extensions
 
-This document outlines the architectural blueprints for upcoming platform extensions, including WebSocket live seat maps, centralized logging, CI/CD pipelines, and distributed load testing.
+This document outlines the architectural blueprints I am actively designing for the next phases of QuickTix, including real-time WebSocket seat map broadcasts, centralized telemetry, automated CI/CD pipelines, and distributed load testing.
 
 ---
 
 ## 1. Real-Time Seat Availability Broadcasts (WebSocket / STOMP)
 
-Currently, seat maps are refreshed on page load and polling. The target architecture integrates full duplex WebSocket connections to broadcast seat status transitions in real time.
+Currently, seat maps load dynamically when navigating to an event detail page. My next milestone is replacing manual refreshes with full-duplex WebSocket connections so that seat status transitions broadcast live to all active attendees:
 
 ```mermaid
 sequenceDiagram
@@ -23,28 +23,28 @@ sequenceDiagram
     Note over ClientB: Seat icon turns gray dynamically<br/>without refreshing page
 ```
 
-* **Redis Pub/Sub Layer**: Enables horizontal scaling across multiple backend instances so that a booking processed on Instance 1 immediately broadcasts to WebSocket clients connected to Instance 2.
-* **Client Handshake**: Authenticated via STOMP headers using the existing JWT access token.
+* **Why I Chose Redis Pub/Sub:** To support horizontal scaling across multiple Spring Boot instances, a booking processed on Pod 1 must broadcast to attendees connected to Pod 2. Redis Pub/Sub will act as the cross-pod message broker.
+* **Authentication:** I plan to validate the existing in-memory JWT access token during the initial STOMP connection handshake.
 
 ---
 
-## 2. Centralized Observability & Logging (ELK / Loki + Grafana)
+## 2. Centralized Observability & Telemetry (Prometheus + Grafana)
 
-To transition from localized container logs to unified production monitoring:
+To transition from container console logs to unified production telemetry, I am planning:
 
-* **Structured JSON Logging**: Spring Boot configured with Logstash Logback encoder to format application logs in structured JSON (including `traceId`, `userId`, `clientIp`, `uri`, and execution latency).
-* **Metrics Export**: Spring Boot Actuator + Micrometer exporting metrics to Prometheus:
-  * HikariCP connection pool usage and wait times.
-  * Redis cache hit/miss ratios.
-  * Rate limit rejection counters (HTTP 429 count by route).
-  * Optimistic locking collision rates (HTTP 409 count by event).
-* **Grafana Dashboards**: Real-time visual tracking of p95/p99 API latencies and system throughput.
+* **Structured JSON Logging:** Configure Logstash Logback encoder in Spring Boot to emit structured JSON logs containing `traceId`, `userId`, `clientIp`, `path`, and execution duration.
+* **Metrics Export via Micrometer & Actuator:** Export live metrics to Prometheus:
+  * HikariCP connection pool active/idle counts and connection acquisition wait times.
+  * Redis cache hit, miss, and timeout ratios.
+  * HTTP 429 rate limit throttle rates by client IP and user.
+  * HTTP 409 optimistic locking collision rates per event.
+* **Grafana Dashboards:** Visual tracking of p95 and p99 API latencies and request throughput.
 
 ---
 
 ## 3. Automated CI/CD Pipeline (GitHub Actions)
 
-Target automated workflow for continuous integration and zero-downtime deployment:
+I am designing an automated continuous integration and deployment pipeline:
 
 ```
 [ Push to main / PR ]
@@ -62,11 +62,11 @@ Target automated workflow for continuous integration and zero-downtime deploymen
          ▼
 [ Stage 3: Container Build & Vulnerability Scan ]
   - Build multi-stage Docker image
-  - Trivy vulnerability scanning on production JRE layer
+  - Run Trivy vulnerability scan on production JRE layer
          │
          ▼
 [ Stage 4: Production Deployment ]
-  - Push image to registry
+  - Push image to container registry
   - Trigger rolling update on production cluster
 ```
 
@@ -74,11 +74,11 @@ Target automated workflow for continuous integration and zero-downtime deploymen
 
 ## 4. Distributed High-Load Testing (k6 / Gatling)
 
-Architectural benchmark harness to stress-test concurrent booking spikes:
+Following my Node.js benchmark scripts ([scripts/race.mjs](../scripts/race.mjs), [scripts/latency.mjs](../scripts/latency.mjs)), I am setting up distributed k6 load testing scenarios:
 
-* **Test Scenario 1: The Scalper Bot Flood**
-  * 1,000 virtual users hitting `POST /api/bookings` concurrently.
-  * Verification: Bucket4j + Redis rate limits throttle 95%+ of bot requests with HTTP 429 within 200ms without database exhaustion.
-* **Test Scenario 2: Viral Ticket Drop Race Condition**
-  * 500 concurrent requests targeting the same 50 available seats.
-  * Verification: Exactly 50 bookings succeed (HTTP 201); remaining requests receive HTTP 409; zero double-booking collisions.
+* **Scenario 1: Scalper Bot Flood**
+  * 1,000 virtual users hammering `POST /api/bookings` concurrently.
+  * Target Metric: My Bucket4j + Redis rate limiter throttles 95%+ of bot requests with HTTP 429 within 200ms, preserving database connection health.
+* **Scenario 2: Viral Ticket Drop Contention**
+  * 500 concurrent requests competing for the exact same 50 available seats.
+  * Target Metric: Exactly 50 bookings succeed (HTTP 201); 450 requests receive HTTP 409 Conflict; zero double-booking collisions occur in PostgreSQL.

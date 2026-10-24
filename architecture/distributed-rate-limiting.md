@@ -1,71 +1,81 @@
 # Distributed Rate Limiting & Anti-Scalping Architecture
 
-This document covers the distributed rate limiting implementation on the booking endpoint (`POST /api/bookings`) using Bucket4j, Lettuce, and Redis 7.
+This document details how I designed, implemented, and verified distributed rate limiting on the booking endpoint (`POST /api/bookings`) using Bucket4j, Lettuce, and Redis 7.
 
 ---
 
-## The Threat Model: Ticket-Scalping Bots
+## Why I Built This: The Scalper Bot Threat
 
-During high-demand ticket drops, automated scalper bots use scripted parallel connections to send hundreds of booking requests per second. While database optimistic locking (`@Version`) guarantees that duplicate bookings are rejected, thousands of concurrent failing transactions will:
-1. Exhaust PostgreSQL's HikariCP connection pool.
-2. Degrade database I/O with continuous transaction rollbacks.
+While building QuickTix, I implemented Hibernate `@Version` optimistic locking to guarantee that two users can never double-book the same seat. But as I thought through high-concurrency ticket drop scenarios, I realized a serious bottleneck:
+
+Automated ticket-scalping bots use scripted parallel connections to hammer the booking endpoint with hundreds of requests per second. Even though my database correctly rejects duplicate attempts with HTTP 409, thousands of failing transactions will:
+1. Exhaust PostgreSQL's HikariCP connection pool threads.
+2. Degrade database I/O through continuous transaction rollbacks.
 3. Starve legitimate human attendees trying to check out.
 
-Rate limiting acts as an **edge filter at the controller boundary**, rejecting abusive request volume before it initiates database transactions.
+To solve this, I designed an edge rate limiter directly at the controller boundary in [`BookingController.java`](../server/src/main/java/com/asyncsourav/quicktix/controller/BookingController.java) to intercept and throttle bot spam before it ever initiates a database transaction.
 
 ---
 
-## Token Bucket Algorithm (Bucket4j) vs Fixed Window
+## Why I Chose Token Bucket (Bucket4j) Over Fixed Window
 
-* **Fixed Window (Flawed)**: Counting requests in static 1-minute blocks creates a "window edge" vulnerability where an attacker sends 5 requests at `00:59` and 5 more at `01:00`, doubling the intended throughput.
-* **Token Bucket (Bucket4j)**: A virtual bucket accumulates tokens continuously at a refill rate up to a maximum burst capacity. This accommodates legitimate bursts (e.g. rapid retries) while throttling continuous automated spam.
+When evaluating rate-limiting algorithms, I compared Fixed Window counters against Token Buckets:
+* **Why I Rejected Fixed Window:** Fixed-window counting (e.g., max 5 requests per calendar minute) suffers from the "window edge" vulnerability. An attacker can fire 5 requests at `00:59` and 5 more at `01:00`, effectively sending 10 requests in 2 seconds and doubling the intended traffic threshold.
+* **Why I Implemented Token Bucket:** A virtual bucket accumulates tokens continuously at a refill rate up to a max burst capacity. This accommodates realistic human behavior (such as an attendee rapidly clicking confirm or retrying once) while mathematically capping sustained automated spam.
 
 ---
 
-## Dual-Tier Limit Policy
+## My Dual-Tier Limiting Policy
 
-QuickTix enforces two independent bucket limits on every booking attempt:
+I decided to enforce two independent token bucket limits on every `POST /api/bookings` call:
 
 ```
 POST /api/bookings
        │
-       ├── 1. Check IP Bucket: "rate:booking:ip:{clientIp}"
+       ├── 1. IP Tier: "rate:booking:ip:{clientIp}"
        │      Capacity: 10 tokens | Refill: 2 tokens/sec
-       │      Purpose: Blocks bot farms hammering from a single IP/proxy
+       │      Why I added this: Stops bot farms hammering from a single IP/proxy before authentication
        │
-       └── 2. Check User Bucket: "rate:booking:user:{username}"
+       └── 2. User Tier: "rate:booking:user:{username}"
               Capacity: 5 tokens  | Refill: 1 token/sec
-              Purpose: Blocks authenticated single-account automation scripts
+              Why I added this: Blocks authenticated users running automated booking scripts
 ```
 
----
-
-## Redis Synchronization via Lettuce (CAS)
-
-Local in-memory rate limiters fail when scaling horizontally across multiple backend instances. QuickTix delegates token state tracking to Redis via the Lettuce driver:
-* **Compare-And-Swap (CAS)**: Bucket4j uses atomic CAS loops to increment/decrement token counts inside Redis across all backend pods.
-* **Shared State**: All application instances read from and write to the same distributed keys, preventing attackers from bypassing limits by spraying requests across different pods.
+In [`BookingController.java`](../server/src/main/java/com/asyncsourav/quicktix/controller/BookingController.java), I extracted the client IP by inspecting `X-Forwarded-For` and `X-Real-IP` reverse proxy headers with fallback to `request.getRemoteAddr()`, ensuring the IP limit works accurately behind Docker or load balancers.
 
 ---
 
-## Outage Resilience: Fail-Open Strategy
+## Distributed Synchronization with Redis & Lettuce
 
-Rate limiting protects system throughput, but **PostgreSQL optimistic locking guarantees booking correctness**. If Redis suffers an outage or network partition, rejecting all bookings would cause a total revenue stoppage for the business.
+In-memory rate limiters (like Guava or simple local maps) fail when horizontal scaling adds multiple backend instances, because an attacker can spray requests across different pods.
 
-Therefore, the rate limiter **fails open**:
+To solve this, I configured Bucket4j to synchronize distributed token state in Redis 7 using the Lettuce driver in [`RateLimiterConfig.java`](../server/src/main/java/com/asyncsourav/quicktix/config/RateLimiterConfig.java):
+* **Atomic Compare-And-Swap (CAS):** Bucket4j executes atomic CAS state updates in Redis across all backend pods.
+* **Shared Cluster State:** Every backend pod checks the exact same distributed keys, making it impossible for bots to bypass limits by rotating connections across instances.
+
+---
+
+## The Outage Edge Case: Why I Implemented Fail-Open Resilience
+
+While designing the rate limiter, I asked myself a critical failure-mode question: *What happens if Redis crashes or suffers a network partition?*
+
+If the rate limiter threw an unhandled exception or rejected all requests when Redis was down, legitimate attendees would be blocked from purchasing tickets, causing total business revenue stoppage. 
+
+Because **PostgreSQL optimistic locking already guarantees 100% data correctness**, rate limiting is an optimization layer, not a safety dependency. Therefore, I implemented a strict **fail-open** design in [`RateLimiterService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/RateLimiterService.java):
+
 ```java
 ConsumptionProbe probe;
 try {
     ProxyManager<String> pm = getProxyManager();
     if (pm == null) {
         log.warn("Rate limiter proxy manager unavailable, failing open for key: {}", key);
-        return true;
+        return true; // Let request proceed to database
     }
     Bucket bucket = pm.builder().build(key, () -> config);
     probe = bucket.tryConsumeAndReturnRemaining(1);
 } catch (Exception e) {
     log.warn("Rate limiter unavailable, failing open: {}", e.toString());
-    return true; // Let request through to PostgreSQL
+    return true; // Let request proceed to database
 }
 
 if (!probe.isConsumed()) {
@@ -75,13 +85,15 @@ if (!probe.isConsumed()) {
 return true;
 ```
 
-* **Short Timeouts (200ms)**: Configured in [`RateLimiterConfig.java`](../server/src/main/java/com/asyncsourav/quicktix/config/RateLimiterConfig.java) to ensure a down Redis instance does not block user threads for more than 200ms before failing open.
+* **Short Timeouts (200ms):** I configured standalone Lettuce connection and command timeouts to `200ms` in `RateLimiterConfig.java`. If Redis is down, user requests are delayed by at most 200ms before failing open directly to PostgreSQL, avoiding thread starvation.
 
 ---
 
-## HTTP 429 Error Envelope
+## HTTP 429 Error Envelope & Rejection Experience
 
-When limits are exceeded, [`GlobalExceptionHandler.java`](../server/src/main/java/com/asyncsourav/quicktix/exception/GlobalExceptionHandler.java) returns standard headers and a structured JSON body:
+When a client exceeds the token bucket limit, I throw a custom `RateLimitExceededException` that passes the required refill wait seconds. 
+
+In [`GlobalExceptionHandler.java`](../server/src/main/java/com/asyncsourav/quicktix/exception/GlobalExceptionHandler.java), I catch this exception and attach standard HTTP rate-limiting headers alongside my uniform error JSON:
 
 ```http
 HTTP/1.1 429 Too Many Requests

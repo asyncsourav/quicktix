@@ -1,14 +1,14 @@
 # Concurrency Control & Double-Booking Prevention
 
-This document details QuickTix's database isolation mechanism designed to eliminate seat over-selling and race conditions during high-volume ticket drops.
+This document details how I designed and verified QuickTix's database isolation mechanism to completely eliminate seat over-selling and race conditions during high-volume ticket drops.
 
 ---
 
-## The Race Condition Problem
+## The Core Challenge I Had to Solve
 
-In viral ticket sales, thousands of users hit the purchase button at the exact same millisecond. 
+In high-demand ticket drops, thousands of users hit the purchase button at the exact same millisecond. 
 
-A naive approach relies on application-level checks:
+Early on, I knew that a naive application-level check would catastrophically fail:
 ```java
 // Vulnerable to race conditions
 if (seat.getStatus() == SeatStatus.AVAILABLE) {
@@ -16,13 +16,22 @@ if (seat.getStatus() == SeatStatus.AVAILABLE) {
     seatRepository.save(seat);
 }
 ```
-Under concurrent load, Thread A and Thread B read `AVAILABLE` simultaneously before either transaction commits. Both threads proceed to create a booking, causing a double-booked seat and corrupted business state.
+Under concurrent traffic, Thread A and Thread B read `AVAILABLE` simultaneously before either transaction commits. Both threads proceed to create a booking, causing a double-booked seat and corrupted business state.
 
 ---
 
-## The Solution: Optimistic Concurrency Control
+## Why I Chose Optimistic Locking Over Pessimistic Locking
 
-QuickTix uses **JPA/Hibernate Optimistic Locking** via an internal version tracking column on the [`Seat.java`](../server/src/main/java/com/asyncsourav/quicktix/entity/Seat.java) entity:
+When deciding how to prevent race conditions at the database layer, I evaluated both Pessimistic and Optimistic locking:
+
+| Architectural Metric | Pessimistic Locking (`SELECT FOR UPDATE`) | My Decision: Optimistic Locking (`@Version`) |
+| :--- | :--- | :--- |
+| **Locking Strategy** | Holds row-level database locks for the entire duration of the transaction | Holds no database locks; checks record version at commit time |
+| **Deadlock Risk** | High when reserving multiple seats in different order across transactions | **Zero deadlock risk** because no row-level database locks are held |
+| **System Throughput** | Degrades rapidly under heavy read/write load as threads wait on locks | **Maximum throughput**; non-conflicting reservations proceed concurrently |
+| **HikariCP Pool Usage** | Keeps connections occupied waiting for lock releases | Releases connections rapidly, maximizing connection pool efficiency |
+
+Because ticket drops are read-heavy with localized bursts of contention, I chose **JPA/Hibernate Optimistic Concurrency Control** via a version column on my [`Seat.java`](../server/src/main/java/com/asyncsourav/quicktix/entity/Seat.java) entity:
 
 ```java
 @Entity
@@ -41,21 +50,23 @@ public class Seat {
 }
 ```
 
-### How the Locking Mechanism Works Under the Hood
+---
 
-1. **Transactional Boundary**: The entire booking workflow in [`BookingService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/BookingService.java) executes inside a Spring `@Transactional` context.
-2. **Read Phase**: The application loads the selected seats along with their current version (e.g., `id = 10, version = 1`).
-3. **Write Phase**: When updating the seat status, Hibernate issues a SQL query with a version predicate:
+## How I Engineered the Locking & Rollback Pipeline
+
+1. **Transactional Boundary:** I wrapped the entire reservation workflow in [`BookingService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/BookingService.java) inside a Spring `@Transactional` boundary.
+2. **Read Phase:** When an attendee initiates checkout, I fetch the requested seats and their current versions (e.g., `id = 10, version = 1`).
+3. **Predicate-Level SQL Write:** When updating the seat status, Hibernate issues a SQL query with a version predicate:
    ```sql
    UPDATE seats
    SET status = 'BOOKED', version = 2, updated_at = NOW()
    WHERE id = 10 AND version = 1;
    ```
-4. **Collision Handling**:
-   * **Winner Thread**: Executes first, updates the row, and increments `version` from `1` to `2`. Exactly 1 row is affected.
-   * **Loser Thread**: Attempts to execute the update `WHERE id = 10 AND version = 1`. Because the version is now `2`, the update matches 0 rows.
-5. **Atomic Batch Rollback**: Hibernate detects 0 updated rows and throws `ObjectOptimisticLockingFailureException`. Spring's transaction manager catches this and rolls back all seat reservations in that batch.
-6. **HTTP 409 Conflict Translation**: [`GlobalExceptionHandler.java`](../server/src/main/java/com/asyncsourav/quicktix/exception/GlobalExceptionHandler.java) translates the exception into a clean, structured HTTP 409 response:
+4. **Collision Handling:**
+   * **Winner Thread:** Executes first, updates the row, and increments `version` from `1` to `2`. Exactly 1 row is affected.
+   * **Loser Thread:** Attempts to execute the update `WHERE id = 10 AND version = 1`. Because the version is already `2`, the update matches 0 rows.
+5. **Atomic Batch Rollback:** Hibernate detects 0 updated rows and throws `ObjectOptimisticLockingFailureException`. Spring's transaction manager catches this and immediately triggers a complete, atomic rollback of the entire booking transaction.
+6. **HTTP 409 Conflict Translation:** In [`GlobalExceptionHandler.java`](../server/src/main/java/com/asyncsourav/quicktix/exception/GlobalExceptionHandler.java), I translate this collision into a clean HTTP 409 response:
    ```json
    {
      "timestamp": "2026-10-24T08:15:00.124",
@@ -68,22 +79,11 @@ public class Seat {
 
 ---
 
-## Why Optimistic Locking vs Pessimistic Locking?
+## How I Verified This with `race.mjs`
 
-| Consideration | Pessimistic Locking (`SELECT FOR UPDATE`) | Optimistic Locking (`@Version`) |
-| :--- | :--- | :--- |
-| **Lock Mechanism** | Database row-level locks held for duration of transaction | No locks held; version checked at commit time |
-| **Deadlock Risk** | High when reserving multiple seats in different order | Zero deadlock risk (no database locks held) |
-| **Throughput** | Degrades rapidly under high concurrent read/write load | Maximum read throughput; non-conflicting writes run in parallel |
-| **Connection Usage**| Keeps database connections busy waiting on locks | Releases connections quickly, maximizing connection pool efficiency |
+To physically prove this mechanism under genuine race conditions, I wrote [`scripts/race.mjs`](../scripts/race.mjs) using `Promise.all` to fire 10 simultaneous asynchronous requests targeting the exact same seat within the same millisecond:
 
----
-
-## Concurrency Test Verification
-
-Dispatched 10 parallel asynchronous booking requests targeting the exact same seat within the same millisecond using [`scripts/race.mjs`](../scripts/race.mjs):
-
-* **Total Dispatched Requests**: 10
-* **Successful Confirmations**: 1 (HTTP 201 Created)
-* **Rejected Collisions**: 9 (HTTP 409 Conflict)
-* **Database State**: Exactly 1 booking record created; seat status is `BOOKED`; `version` incremented from `1` to `2`.
+* **Total Dispatched Requests:** 10
+* **Successful Confirmations:** 1 (HTTP 201 Created)
+* **Rejected Collisions:** 9 (HTTP 409 Conflict)
+* **Database State:** Exactly 1 booking was created in PostgreSQL; the seat status changed to `BOOKED`; the version incremented from `1` to `2`. Zero double-bookings occurred.
