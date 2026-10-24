@@ -81,7 +81,7 @@ public class Seat {
 
 ## Concurrency Test Verification
 
-Dispatched 10 parallel asynchronous booking requests targeting the exact same seat within the same millisecond:
+Dispatched 10 parallel asynchronous booking requests targeting the exact same seat within the same millisecond using [`scripts/race.mjs`](../scripts/race.mjs):
 
 * **Total Dispatched Requests**: 10
 * **Successful Confirmations**: 1 (HTTP 201 Created)

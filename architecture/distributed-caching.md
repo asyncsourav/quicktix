@@ -38,7 +38,7 @@ Event browsing accounts for more than 90% of total application traffic. To prote
   ```
 
 ### 2. Write Operations & Cache Invalidation (`@CacheEvict`)
-To prevent stale reads, creating, modifying, or deleting an event immediately evicts the cached entries:
+To prevent stale reads, creating, modifying, or deleting an event immediately evicts the cached entries (verified via [`scripts/check-eviction.mjs`](../scripts/check-eviction.mjs)):
 ```java
 @CacheEvict(value = {"events", "event"}, allEntries = true)
 public EventResponse updateEvent(Long id, EventRequest request, String username) { ... }
@@ -80,8 +80,8 @@ public class CacheErrorConfig implements CachingConfigurer {
 ---
 
 ## Latency Benchmark (1,000 Seeded Events)
-
-Timing 200 sequential requests per endpoint against the live containerized stack:
+ 
+Timing 200 sequential requests per endpoint via [`scripts/latency.mjs`](../scripts/latency.mjs) against the live containerized stack:
 
 | Endpoint | Metric | Run A: PostgreSQL Only | Run B: Redis 7 Cache | Improvement |
 | :--- | :--- | :--- | :--- | :--- |
