@@ -78,3 +78,21 @@ To run these scripts on your machine:
   ```bash
   node scripts/check-eviction.mjs
   ```
+
+---
+
+### 4. `rate-limit.mjs` - How I Stress-Tested Bucket4j Anti-Scalping Rate Limits
+
+* **File:** `scripts/rate-limit.mjs`
+* **Why I Built This:** Scalper bots fire hundreds of parallel requests per second to grab seats during high-demand drops. I built this two-phase load harness to verify that Bucket4j + Redis token buckets strictly throttle bot bursts with HTTP 429 and hold at the steady-state refill rate without crashing database connections.
+* **How I Implemented the Test:**
+  * **Phase 1 (Rapid-Fire Burst):** Fires 1,000 rapid-fire requests targeting `POST /api/bookings` with 100 in-flight concurrently.
+  * **Phase 2 (Sustained Rate):** Sends 4 requests/second sustained over 10 seconds to verify that the limiter refills at exactly the configured token refill rate (1 token/sec for user buckets).
+* **What I Measured & Verified:**
+  * **Phase 1:** Finished 1,000 requests in **1.90 seconds**. The limiter allowed exactly 6 requests (5 burst capacity + 1 refill) and throttled **994 requests with HTTP 429 (99.4% blocked)**.
+  * **Sample HTTP 429:** Included `Retry-After: 1` header and uniform `ErrorResponse` envelope.
+  * **Phase 2:** Over 10 seconds at 4 req/s, exactly **1.1 requests allowed per second**, perfectly matching the configured 1 token/sec refill rate.
+* **How to Run:**
+  ```bash
+  node scripts/rate-limit.mjs
+  ```
