@@ -1,6 +1,6 @@
 # End-to-End System Architecture & Request Lifecycle
 
-This document provides a comprehensive, visual walkthrough of how I architected QuickTix's primary request workflows across the frontend, security filters, rate limiters, caching layers, business logic, and transactional database persistence.
+This document provides a clean, visual walkthrough of how I architected QuickTix's primary request workflows across the frontend, security filters, rate limiters, caching layers, business logic, and transactional database persistence.
 
 ---
 
@@ -178,119 +178,56 @@ sequenceDiagram
 
 ---
 
-## Workflow 3: Dual-Token Auth, Silent Rotation & Replay Defense
+## Workflow 3: Dual-Token Auth, Silent Rotation & Replay Defense (`/api/auth/*`)
 
 ### Purpose
-To protect user sessions against XSS token theft, session hijacking, and replay attacks without using server-side session state.
+To provide seamless authentication for human users while eliminating XSS credential theft and automatically neutralizing stolen refresh tokens.
 
-I structured this lifecycle into three clean phases:
-
----
-
-### Phase 1: Login & Token Issuance
-
-When an attendee logs in, the server generates an in-memory access token and an HttpOnly refresh cookie:
-
-```
-Client (Browser)                   Server (AuthController)                 Database (PostgreSQL)
-     │                                       │                                       │
-     ├─── POST /api/auth/login ─────────────►│                                       │
-     │    { email, password }                │                                       │
-     │                                       ├── Validate credentials                │
-     │                                       ├── Generate unique session family UUID │
-     │                                       ├── SHA-256 hash raw refresh token ────►│ Store hash record
-     │                                       │                                       │ (family_id, used=false)
-     │◄── HTTP 200 OK ───────────────────────┤                                       │
-     │    1. JSON Body: Access Token (15m)   │                                       │
-     │    2. Cookie: refreshToken (7d,       │                                       │
-     │       HttpOnly, Secure, SameSite=Lax) │                                       │
-```
-
-* **Access Token:** 15-minute lifespan, stored only in frontend memory (never in `localStorage` or `sessionStorage`), eliminating XSS token theft.
-* **Refresh Token:** 7-day lifespan, sent in a Secure, `HttpOnly` cookie inaccessible to browser JavaScript.
-* **Database Hash:** Only the SHA-256 digest is stored in PostgreSQL. If the database is ever breached, raw refresh tokens cannot be reconstructed.
+### Token Strategy
+* **Access Token:** 15-minute lifespan, stored only in frontend memory (never in `localStorage`).
+* **Refresh Token:** 7-day lifespan, sent in a Secure, `HttpOnly` cookie inaccessible to JavaScript.
+* **Database Session:** SHA-256 token hash tracked in PostgreSQL with a unique `family_id`.
 
 ---
 
-### Phase 2: Silent Rotation (The Safe Refresh)
+### Silent Rotation vs Replay Attack Defense
 
-When the 15-minute access token expires, the client's Axios interceptor transparently sends `POST /api/auth/refresh`:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as User / Attacker
+    participant Ctrl as AuthController
+    participant Svc as AuthService
+    participant DB as PostgreSQL (refresh_tokens)
 
-```
-Client (Browser)                   Server (AuthService)                    Database (PostgreSQL)
-     │                                       │                                       │
-     ├─── POST /api/auth/refresh ───────────►│                                       │
-     │    (HttpOnly cookie sent by browser)  ├── Atomic Token Claim:                 │
-     │                                       │   UPDATE refresh_tokens               │
-     │                                       │   SET used=true                       │
-     │                                       │   WHERE id=? AND used=false ─────────►│ 1 row affected
-     │                                       │                                       │ (Current token burned)
-     │                                       ├── Generate new token pair             │
-     │                                       │   under same family UUID ────────────►│ Insert new token hash
-     │                                       │                                       │
-     │◄── HTTP 200 OK ───────────────────────┤                                       │
-     │    New Access Token + Rotated Cookie  │                                       │
-```
+    Client->>Ctrl: POST /api/auth/refresh (HttpOnly Cookie)
+    Ctrl->>Svc: refresh(cookieToken)
+    Svc->>DB: Lookup token by SHA-256 hash
 
-* **Atomic Claim:** The SQL statement `UPDATE refresh_tokens SET used = true WHERE id = ? AND used = false` atomically marks the token as used. If two concurrent requests arrive simultaneously with the same token, only one can succeed, preventing session family splitting.
-
----
-
-### Phase 3: Token Replay Attack (The Security Trap)
-
-If an attacker intercepts an old, already-used refresh token and attempts to refresh the session:
-
-```
-Attacker                           Server (AuthService)                    Database (PostgreSQL)
-     │                                       │                                       │
-     ├─── POST /api/auth/refresh ───────────►│                                       │
-     │    (Replaying stolen refresh token)   ├── SHA-256 hash lookup in DB           │
-     │                                       │   Token found, but used == true!      │
-     │                                       │                                       │
-     │                                       │   SECURITY ALERT: REPLAY DETECTED!    │
-     │                                       │                                       │
-     │                                       ├── Revoke entire family:               │
-     │                                       │   UPDATE refresh_tokens               │
-     │                                       │   SET revoked=true                    │
-     │                                       │   WHERE family_id=? ─────────────────►│ All family tokens revoked!
-     │                                       │                                       │
-     │◄── HTTP 401 Unauthorized ─────────────┤                                       │
-     │    Set-Cookie: refreshToken;          │                                       │
-     │    Max-Age=0 (Wipes browser cookie)   │                                       │
+    alt Scenario 1: Normal Silent Rotation (used == false)
+        Svc->>DB: Atomic claim: UPDATE refresh_tokens SET used=true WHERE id=? AND used=false
+        Svc->>DB: Store new rotated token hash (same family UUID)
+        Svc-->>Client: HTTP 200 OK (New Access Token + Rotated HttpOnly Cookie)
+    else Scenario 2: Token Replay Detected (used == true)
+        Note over Svc: SECURITY ALERT: Stolen token replayed!
+        Svc->>DB: Revoke entire family: UPDATE refresh_tokens SET revoked=true WHERE family_id=?
+        Svc-->>Client: HTTP 401 Unauthorized (Cookie wiped with Max-Age=0)
+    end
 ```
 
-* **The Rollback Fix:** In [`AuthService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/AuthService.java), I annotated `refresh()` with `@Transactional(noRollbackFor = BadCredentialsException.class)`. This ensures that even when the method throws an exception to reject the attacker, the family revocation is committed to PostgreSQL. Both the attacker and the victim sessions are instantly terminated.
+### Key Engineering Defenses
 
----
+1. **Atomic Token Claiming:**
+   I wrote the claim statement as a single atomic SQL query in [`RefreshTokenRepository.java`](../server/src/main/java/com/asyncsourav/quicktix/repository/RefreshTokenRepository.java):
+   ```sql
+   UPDATE refresh_tokens SET used = true WHERE id = :id AND used = false AND revoked = false;
+   ```
+   If two parallel requests hit `/api/auth/refresh` at the same time, only one can update the row. The other receives 0 rows affected and fails instantly, preventing split session families.
 
-## Workflow 4: Cache Invalidation on Event Updates (`PUT /api/events/{id}`)
-
-When an organizer or administrator modifies event metadata, stale catalog keys in Redis are purged immediately:
-
-```
-Organizer / Admin: PUT /api/events/{id}
-       │
-       ▼
-1. Security Check: Verify caller has role ORGANIZER or ADMIN.
-2. Ownership Guard: Verify organizer owns the event (or user is ADMIN).
-3. EventService (@Transactional):
-   - Updates record in PostgreSQL.
-   - Triggers Spring Cache directive:
-     @CacheEvict(value = {"events", "event"}, allEntries = true)
-4. Redis 7:
-   - Evicts all cached catalog and event detail keys immediately.
-5. Next Client Read:
-   - Queries PostgreSQL, receives fresh data, and repopulates Redis.
-```
-
----
-
-## Failure Modes & System Resilience Matrix
-
-| Component | Failure Condition | How I Engineered the System Response | User Experience |
-| :--- | :--- | :--- | :--- |
-| **Redis 7** | Cache offline / timeout | `CacheErrorConfig` catches 200ms timeout and falls back to PostgreSQL | Catalog queries succeed (HTTP 200) with zero downtime |
-| **Redis 7** | Limiter offline / timeout | `RateLimiterService` fails open and delegates safety to PostgreSQL | Bookings succeed (HTTP 201); optimistic locking protects data |
-| **PostgreSQL** | Concurrent seat clash | Hibernate `@Version` mismatch triggers atomic batch rollback | Loser receives HTTP 409 Conflict with seat re-selection prompt |
-| **Auth JWT** | Access token expired | Axios interceptor pauses queue and calls `/api/auth/refresh` | Experience is seamless; token refreshed silently in background |
-| **Refresh Token**| Token replayed / stolen | `AuthService` revokes all family tokens with `noRollbackFor` commit | Both sessions terminated; credentials protected from replay |
+2. **Commit on Reuse Detection (`noRollbackFor`):**
+   In [`AuthService.java`](../server/src/main/java/com/asyncsourav/quicktix/service/AuthService.java), I configured:
+   ```java
+   @Transactional(noRollbackFor = BadCredentialsException.class)
+   public AuthResponse refresh(String incomingToken, HttpServletResponse response) { ... }
+   ```
+   This ensures that when token reuse is detected, the family revocation is committed to PostgreSQL before the HTTP 401 exception is thrown, guaranteeing that the stolen session family is permanently terminated.
