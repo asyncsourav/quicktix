@@ -37,7 +37,13 @@ The client provides an interactive seat selection experience, transparent sessio
 
 ## Key Features
 
-### 1. Interactive Seat Reservation Grid
+### 1. High-Performance Landing Page & Live Showcase
+* **Hero Architecture Showcase**: Real-time platform metric counters (`0` double-bookings, `< 20ms` Redis read latency, `1,000+` live events, `100%` ACID isolation).
+* **System Engineering Deep Dive**: Architectural feature cards detailing Hibernate `@Version` optimistic locking, Redis 7 distributed caching with automatic `@CacheEvict`, rotating HttpOnly refresh tokens, and real-time seat isolation.
+* **3-Step Frictionless Workflow**: Visual user journey covering discovery, seat selection, and atomic checkout.
+* **Live Interactive Catalog**: Category filters (`Concert`, `Sports`, `Theater`, `Conference`, `Comedy`), keyword search, and direct seat selection links.
+
+### 2. Interactive Seat Reservation Grid
 * **Dynamic Grid Layout**: Automatically adapts to venue capacity (e.g. 50 seats for arenas, 40 for amphitheaters, 30 for conference halls).
 * **Seat State Rendering**: Clear visual states for `AVAILABLE` (selectable), `BOOKED` (disabled), and `SELECTED` (active user selection).
 * **Live Price Calculation**: Calculates itemized pricing and subtotal dynamically as seats are toggled.
