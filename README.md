@@ -30,8 +30,11 @@ QuickTix is designed as a decoupled, containerized client-server system with str
    ├── Web Layer (@RestController)
    │     └── DTO validation, REST responses (ApiResponse<T>, ErrorResponse)
    │
+   ├── Rate Limiting Layer (Bucket4j + Lettuce / Redis 7)
+   │     └── Anti-Scalper Bot Shield (Per-user burst 5, per-IP burst 10, fail-open)
+   │
    ├── Caching Layer (Spring Data Redis / Lettuce)
-   │     └── Redis Cache Manager (@Cacheable hot paths, @CacheEvict, 5-min TTL)
+   │     └── Redis Cache Manager (@Cacheable hot paths, @CacheEvict, 5-min TTL, CacheErrorConfig fail-open)
    │
    ├── Business Layer (@Service)
    │     ├── BookingService (Atomic @Transactional reservations)
