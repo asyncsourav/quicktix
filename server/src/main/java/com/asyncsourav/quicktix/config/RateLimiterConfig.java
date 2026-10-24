@@ -19,13 +19,15 @@ import java.time.Duration;
 @Configuration
 public class RateLimiterConfig {
 
-        
+
     @Value("${spring.data.redis.host:localhost}")
     private String redisHost;
 
     @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
+   
+    // With 200ms timeouts, the rate limiter detects the issue almost instantly, logs the warning, and fails open (allow the request to proceed)
     @Value("${spring.data.redis.timeout:200ms}")
     private Duration redisTimeout;
 
