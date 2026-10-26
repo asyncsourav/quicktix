@@ -1,175 +1,121 @@
 # QuickTix
 
-A high-performance, concurrency-safe distributed live event ticketing and seat reservation platform built with [Java 25](https://openjdk.org/projects/jdk/25/), [Spring Boot 4](https://spring.io/projects/spring-boot), [PostgreSQL 16](https://www.postgresql.org/), [Redis 7](https://redis.io/), [Docker](https://www.docker.com/), and [React 19](https://react.dev/).
+An event ticketing platform. Users browse events, pick seats on a live seat map and book them. The backend guarantees a seat can never be booked twice, and every seat change shows up on other viewers' screens without a refresh.
 
-I built QuickTix to solve the high-concurrency ticket drop challenge: ensuring that when thousands of users attempt to reserve the exact same seats simultaneously, the system guarantees strict ACID consistency, sub-20ms catalog reads, and zero double-bookings without deadlocking database threads.
+**Live demo (frontend):** https://quicktix-weld.vercel.app/
+**API docs (when running locally):** http://localhost:8080/swagger-ui.html
 
-**Live Demo:** [https://quicktix-weld.vercel.app/](https://quicktix-weld.vercel.app/)  
-**Interactive API Documentation:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)  
-**Architecture & Engineering Handbook:** [architecture/](architecture/README.md)  
-**Verification & Benchmark Scripts:** [scripts/](scripts/README.md)
+## What it does
 
----
+- Register and log in as an attendee, organizer or admin
+- Organizers create venues and publish events; seats are generated automatically from venue capacity
+- Browse and filter events, open an event and see its seat map
+- Book or cancel seats; the seat map updates live for everyone viewing that event
+- Confirmation emails for bookings and cancellations
+- Admin endpoints for platform stats, users and bookings
 
-## System Architecture
+## Tech stack
 
-```
-[ React 19 Client (Vite) ]
-            │
-            │ HTTPS (In-Memory Bearer JWT + HttpOnly Cookie)
-            ▼
-[ Spring Boot 4 Application Service ] (Port 8080)
-   ├── Security Filter Chain: Stateless JwtAuthFilter & Centralized CORS
-   ├── Web Layer: DTO validation via Jakarta @Valid & Swagger OpenAPI
-   ├── WebSocket Broker: STOMP over /ws with SockJS fallback & /topic/event.{id}
-   ├── Rate Limiting Layer: Bucket4j + Lettuce / Redis 7 (Anti-scalping bot shield)
-   ├── Caching Layer: Redis Cache Manager (@Cacheable hot paths & @CacheEvict)
-   ├── Business Layer: Atomic @Transactional reservations & ownership guards
-   ├── Real-Time Sync: STOMP WebSocket broker (/topic/event.{id})
-   ├── Async Messaging: @Async EmailService backed by ThreadPoolTaskExecutor
-   └── Persistence Layer: Hibernate 7 @Version Optimistic Locking
-            │                              │
-            │ Cache Reads & Token Buckets  │ JDBC Connection Pool (HikariCP)
-            ▼                              ▼
-[ Redis 7 In-Memory Store ]       [ PostgreSQL 16 Relational Database ]
-(Port 6379, Docker named volume)   (Port 5432, Docker named volume)
-```
+| Area | Technology |
+|---|---|
+| Backend | Java 25, Spring Boot 4, Spring Security, Spring Data JPA (Hibernate 7) |
+| Database | PostgreSQL 16 |
+| Cache and rate limiting | Redis 7, Spring Cache, Bucket4j (Lettuce) |
+| Real-time | Spring WebSocket with STOMP and SockJS |
+| Auth | JWT access tokens, rotating refresh tokens in HttpOnly cookies |
+| API docs | springdoc-openapi (Swagger UI) |
+| Frontend | React 19, Vite, React Router, Axios, @stomp/stompjs |
+| Infrastructure | Docker, Docker Compose (multi-stage backend image) |
 
----
+## Key design decisions
 
-## Domain Model
+**Seats can't be double-booked.** Each seat has a `@Version` column. A booking runs in one transaction, and if two requests race for the same seat, one commit fails the version check, rolls back and returns `409 Conflict`. Correctness comes from PostgreSQL, not from anything in Redis.
 
-```mermaid
-erDiagram
-    USER ||--o{ VENUE : organizes
-    USER ||--o{ EVENT : publishes
-    USER ||--o{ BOOKING : reserves
-    USER ||--o{ REFRESH_TOKEN : owns
-    VENUE ||--o{ EVENT : hosts
-    EVENT ||--o{ SEAT : contains
-    EVENT ||--o{ BOOKING : targets
-    BOOKING ||--o{ SEAT : allocates
+**Auth without tokens in browser storage.** The access token (15 minutes) lives only in JavaScript memory. The refresh token (7 days) is an opaque value in an HttpOnly cookie, and only its SHA-256 hash is stored in the database. Every refresh is single-use and issues a new token in the same session family. If a used token shows up again, the whole family is revoked. Writing concurrent tests for this found two real bugs: the revoke was being rolled back by the exception thrown after it, and two simultaneous refreshes could both succeed. Both are fixed (`noRollbackFor`, and an atomic `UPDATE ... WHERE used = false`).
 
-    USER {
-        bigint id PK
-        varchar email UK
-        varchar role "ADMIN | ORGANIZER | USER"
-    }
-    VENUE {
-        bigint id PK
-        varchar name
-        int total_capacity
-    }
-    EVENT {
-        bigint id PK
-        varchar title
-        decimal base_price
-        timestamp start_time
-    }
-    SEAT {
-        bigint id PK
-        varchar seat_label
-        varchar status "AVAILABLE | HELD | BOOKED"
-        bigint version "Optimistic Locking Column"
-    }
-    BOOKING {
-        bigint id PK
-        decimal total_amount
-        varchar status "CONFIRMED | CANCELLED"
-    }
-    REFRESH_TOKEN {
-        bigint id PK
-        varchar token_hash UK
-        varchar family_id
-        boolean used
-        boolean revoked
-    }
-```
+**Caching that fails open.** Event listing and event detail are cached in Redis with a 5-minute TTL and evicted when an event is created, updated or deleted. Seat availability is deliberately not cached, because it has to be accurate when someone books. If Redis is down, cache errors are logged and requests fall back to PostgreSQL.
 
----
+**Rate limiting on booking.** `POST /api/bookings` is protected by per-user and per-IP token buckets stored in Redis, so the limit holds across several backend instances. Rejected requests get `429` with a `Retry-After` header. If Redis is unreachable the limiter fails open, since it protects the system but isn't what keeps bookings correct.
 
-## Engineering Highlights & Technical Deep Dives
+**Live seat map.** After a booking or cancellation commits, the backend publishes the seat change to `/topic/event.{id}` over STOMP, and the React seat picker subscribes to that topic.
 
-I documented each core subsystem in detail within the **[architecture/](architecture/README.md)** handbook:
+**Email off the request path.** Confirmation emails are sent on a separate thread pool, so a slow mail server doesn't delay the booking response.
 
-* **[End-to-End Request Lifecycle](architecture/master-workflow.md)**: Full trace of requests from frontend click to database commit, with sequence diagrams for all primary lifecycles and failure mode resilience analysis.
-* **[Concurrency Control & Optimistic Locking](architecture/concurrency-control.md)**: Hibernate `@Version` collision prevention, predicate-based SQL updates, and atomic batch rollbacks guaranteeing zero double-bookings.
-* **[Distributed Caching Layer](architecture/distributed-caching.md)**: Sub-20ms catalog reads via Redis 7, deterministic `@CacheEvict` invalidation, 5-minute safety TTL, and fail-open `CacheErrorConfig`.
-* **[Distributed Rate Limiting](architecture/distributed-rate-limiting.md)**: Bucket4j + Lettuce anti-scalping bot protection on `POST /api/bookings` with per-user (burst 5) and per-IP (burst 10) limits.
-* **[Security & Dual-Token Auth](architecture/security-and-auth.md)**: In-memory 15-minute access tokens, Secure HttpOnly 7-day refresh cookies, SHA-256 database token hashing, and session family reuse detection.
-* **[Real-Time Seat Synchronization](architecture/realtime-seat-sync.md)**: Full-duplex STOMP WebSocket broker on `/ws` broadcasting live seat status updates (`AVAILABLE`, `HELD`, `BOOKED`) to `/topic/event.{eventId}` without page refresh; benchmarked across 50 concurrent sockets in a median of 15.8 ms (p95 20.7 ms) on localhost.
-* **[Production Containerization](architecture/containerization.md)**: Multi-stage Alpine Docker build achieving a 50.1% container size reduction (from 870 MB down to 434 MB).
-* **[Future Architectural Roadmap](architecture/future-roadmap.md)**: Blueprints for clustered Redis Pub/Sub brokers, Prometheus/Grafana metrics, automated CI/CD, and k6 load testing.
-* **[Verification & Benchmark Scripts](scripts/README.md)**: Standalone test harnesses for concurrency collision testing (`race.mjs`), Redis latency benchmarking (`latency.mjs`), cache invalidation verification (`check-eviction.mjs`), rate limit verification (`rate-limit.mjs`), and STOMP broadcast latency (`websocket-latency.mjs`).
+## Measured results
 
----
+All numbers come from the scripts in [`scripts/`](scripts/), run against the Docker Compose stack on one local machine.
 
-## Technology Stack
+| What | Result |
+|---|---|
+| 10 simultaneous requests for the same seat | 1 × `201`, 9 × `409` |
+| Event listing, 1,000 events, 200 sequential requests, p50 | 22.1 ms without cache, 17.7 ms with Redis (about 20% faster) |
+| Single event, same setup, p50 | 15.3 ms without cache, 13.7 ms with Redis (about 10% faster) |
+| 1,000 rapid-fire booking requests, 100 in flight | 994 blocked with `429` (99.4%) in 1.9 s, 6 allowed |
+| Sustained 4 requests/second for 10 s | 11 allowed, about 1 per second |
+| Live seat update to 50 WebSocket clients, 30 rounds | 1,500 of 1,500 delivered, median 15.8 ms, p95 20.7 ms |
+| Backend Docker image | 870 MB (single-stage) to 434 MB (multi-stage), about 50% smaller |
 
-| Layer | Technology | Key Capabilities |
-| :--- | :--- | :--- |
-| **Backend Runtime** | Java 25 | LTS features, virtual thread readiness, modern syntax |
-| **Backend Framework** | Spring Boot 4.0 | REST API, Spring Security, Spring Cache, Spring Data JPA |
-| **Real-Time Messaging** | Spring WebSocket & STOMP | Full-duplex live seat status fan-out to connected attendees |
-| **Distributed Store** | Redis 7 & Lettuce | Sub-millisecond catalog caching, atomic Bucket4j rate limiting |
-| **Database Engine** | PostgreSQL 16 | ACID transactional persistence, relational integrity, indexes |
-| **ORM & Concurrency** | Hibernate 7 | Predicate-level optimistic locking via `@Version` |
-| **API Documentation** | springdoc-openapi 2.8 | OpenAPI 3.0 specification, interactive Swagger UI dashboard |
-| **Containerization** | Docker & Compose | Optimized multi-stage build, healthcheck-driven service orchestration |
-| **Frontend Client** | React 19 & Vite 6 | Fast HMR bundling, interactive venue seat picker, responsive design |
-| **Client Real-Time** | @stomp/stompjs | WebSocket STOMP subscription on `/topic/event.{id}` |
-| **Client Routing** | React Router 6 | Declarative role guards (`USER`, `ORGANIZER`, `ADMIN`) |
-| **Client Auth & HTTP** | Axios Interceptors | In-memory token management, silent HttpOnly refresh queueing |
+Notes: the cache gain is modest because PostgreSQL on localhost is already fast, and the WebSocket timer runs from the moment the booking request is sent to the moment each client receives the update. Both were measured on localhost, so a deployed setup will show different numbers.
 
----
+## Run it locally
 
-## Quick Start (Run with Docker Compose)
+Requirements: Docker, and Node.js 18+ for the frontend.
 
-### 1. Clone & Configure
 ```bash
 git clone https://github.com/asyncsourav/quicktix.git
 cd quicktix
 cp .env.example .env
 ```
 
-### 2. Launch Stack
+Set `JWT_SECRET` in `.env` to a long random value, for example:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Start PostgreSQL, Redis and the backend:
+
 ```bash
 docker compose up -d --build
 ```
-This single command:
-1. Boots PostgreSQL 16 with health checks and persistent volume storage.
-2. Boots Redis 7 with health checks and persistent volume storage.
-3. Builds the Java 25 backend via multi-stage compilation and launches it on port `8080`.
-4. Automatically seeds initial demo users, venues, and live events.
 
-### 3. Launch Frontend Client
+Start the frontend:
+
 ```bash
 cd client
 npm install
 npm run dev
 ```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
 
----
+The app is at http://localhost:5173 and the API at http://localhost:8080. Demo data (users, venues, events) is seeded on first start.
 
-## Demo Accounts
+To stop everything and keep the data: `docker compose down`. To also delete the database volume: `docker compose down -v`.
 
-Pre-seeded accounts are immediately available for review with default password `password123`:
+## Demo accounts
 
-| Role | Email | Password | Access Scope |
-| :--- | :--- | :--- | :--- |
-| **Admin** | `admin@quicktix.com` | `password123` | Platform oversight, user management, revenue stats |
-| **Organizer** | `organizer@quicktix.com` | `password123` | Venue registration, event publication |
-| **Attendee (User)** | `user@quicktix.com` | `password123` | Event browsing, seat selection, booking creation |
+Seeded for local use only, all with the password `password123`:
 
-> All 24 REST endpoints, request/response DTO schemas, and interactive test executions are available in Swagger UI at **[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)**.
+| Role | Email |
+|---|---|
+| Admin | `admin@quicktix.com` |
+| Organizer | `organizer@quicktix.com` |
+| Attendee | `user@quicktix.com` |
 
----
+## Repository layout
+
+```
+quicktix/
+├── client/     React frontend          (see client/README.md)
+├── server/     Spring Boot backend     (see server/README.md)
+├── scripts/    Test and benchmark scripts for the results above
+├── docker-compose.yml
+└── .env.example
+```
+
+## Status
+
+Working: everything above. In progress: unit and integration tests (JUnit 5, Mockito, Testcontainers) with a coverage report, a CI pipeline, and a hosted backend.
 
 ## Author
 
-**Sourav Kumar**
-* **GitHub:** [https://github.com/asyncsourav](https://github.com/asyncsourav)
-* **LinkedIn:** [https://www.linkedin.com/in/asyncsourav](https://www.linkedin.com/in/asyncsourav)
-* **LeetCode:** [https://leetcode.com/u/asyncsourav](https://leetcode.com/u/asyncsourav)
-* **Email:** [xsouravkumar357@gmail.com](mailto:xsouravkumar357@gmail.com)
+Sourav Kumar · [GitHub](https://github.com/asyncsourav) · [LinkedIn](https://www.linkedin.com/in/asyncsourav) · [LeetCode](https://leetcode.com/u/asyncsourav)
