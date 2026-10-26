@@ -43,11 +43,12 @@
 [ 6. Persistence & Concurrency Control (PostgreSQL 16) ]
      ├── Optimistic Locking: Hibernate @Version check on Seat (WHERE id=? AND version=?)
      ├── ACID Commit: Commit booking or trigger atomic batch rollback on collision
-     └── Real-Time Broadcast: SimpMessagingTemplate pushes status to /topic/event.{id}
+     ├── Real-Time Broadcast: SimpMessagingTemplate pushes status to /topic/event.{id}
+     └── Async Notification: @Async EmailService dispatches receipt on mailTaskExecutor
              │
              ▼
 [ 7. Response Dispatch ]
-     ├── HTTP 200 / 201: ApiResponse<T> JSON envelope
+     ├── HTTP 200 / 201: ApiResponse<T> JSON envelope (unblocked by email dispatch)
      ├── HTTP 409: Seat conflict (ObjectOptimisticLockingFailureException)
      └── HTTP 429: Rate limit exceeded (Retry-After header attached)
 ```
@@ -87,7 +88,10 @@ flowchart TD
     Limiter -->|Tokens Available / Fail-Open| Svc[BookingService]
     
     Svc --> DB{PostgreSQL @Version Check}
-    DB -->|Version Match - Winner| Confirmed([HTTP 201 Booking Confirmed])
+    DB -->|Version Match - Winner| Commit[Commit ACID Transaction]
+    Commit --> STOMP[SimpMessagingTemplate: Broadcast /topic/event.id]
+    Commit --> Email["@Async EmailService: Background dispatch on mailTaskExecutor"]
+    Commit --> Confirmed([HTTP 201 Booking Confirmed])
     DB -->|Version Conflict - Loser| Conflict([HTTP 409 Seat Conflict - Rollback])
 ```
 
@@ -96,6 +100,7 @@ flowchart TD
 * **Optimistic Locking:** `UPDATE seats SET status='BOOKED', version=2 WHERE id=:id AND version=1`.
   * Winner (1 row affected): HTTP 201 Created.
   * Loser (0 rows affected): OptimisticLockingFailure -> transaction rollback -> HTTP 409 Conflict.
+* **Async Decoupling:** `EmailService` dispatches confirmation emails on a background thread pool (`mailTaskExecutor`). Zero impact on HTTP response latency even if SMTP is slow or unreachable.
 * **Deep Dives:** [`distributed-rate-limiting.md`](distributed-rate-limiting.md) and [`concurrency-control.md`](concurrency-control.md).
 
 ---

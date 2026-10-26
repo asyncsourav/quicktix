@@ -25,6 +25,8 @@ I built QuickTix to solve the high-concurrency ticket drop challenge: ensuring t
    ├── Rate Limiting Layer: Bucket4j + Lettuce / Redis 7 (Anti-scalping bot shield)
    ├── Caching Layer: Redis Cache Manager (@Cacheable hot paths & @CacheEvict)
    ├── Business Layer: Atomic @Transactional reservations & ownership guards
+   ├── Real-Time Sync: STOMP WebSocket broker (/topic/event.{id})
+   ├── Async Messaging: @Async EmailService backed by ThreadPoolTaskExecutor
    └── Persistence Layer: Hibernate 7 @Version Optimistic Locking
             │                              │
             │ Cache Reads & Token Buckets  │ JDBC Connection Pool (HikariCP)
