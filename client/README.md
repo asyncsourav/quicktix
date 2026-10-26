@@ -16,6 +16,7 @@ I designed the client to provide an interactive venue seat selection experience,
   * `AuthContext`: In-memory access token storage, user profile state, silent cookie-based session hydration on mount, and login/logout lifecycles. I stored zero credentials in `localStorage` to completely eliminate XSS token theft.
   * `ThemeContext`: Dark/Light theme state with CSS custom properties and persistence.
 * **Silent Token Refresh Pipeline**: I engineered an [Axios](https://axios-http.com/) interceptor that transparently intercepts HTTP 401 responses, queues concurrent in-flight requests, calls `/api/auth/refresh` with credentials (HttpOnly cookie), and replays pending requests with the new access token without interrupting the user.
+* **Live WebSocket / STOMP Synchronization**: I integrated `@stomp/stompjs` to subscribe to `/topic/event.${id}` over `/ws`. When other attendees purchase or release seats, the seat grid immediately updates colors in real-time, automatically deselecting any seat that was claimed by another customer without page reloads.
 * **Declarative Route Guards**: I created component-level route guards (`ProtectedRoute`) that prevent unauthorized navigation before views render, gracefully handling session verification loading states.
 * **Resilient Concurrency UI**: When a booking collision occurs (backend returns HTTP 409 Conflict), I catch the error, display an informative alert to the user, and immediately trigger a seat map refresh without resetting other page state.
 * **Zero CSS Framework Overhead**: I built the entire UI with pure Vanilla CSS and custom property design tokens for fast layout calculations, custom dark/light theme transitions, and zero style bundle bloat.
@@ -26,6 +27,7 @@ I designed the client to provide an interactive venue seat selection experience,
 
 * **UI Framework:** [React 19](https://react.dev/)
 * **Build Tool & Bundler:** [Vite 6](https://vitejs.dev/)
+* **Real-Time Client:** [@stomp/stompjs 7.0](https://stomp-js.github.io/) (STOMP over WebSocket)
 * **Client-Side Routing:** [React Router 6](https://reactrouter.com/)
 * **HTTP Client:** [Axios 1.7](https://axios-http.com/)
 * **Icons:** [lucide-react](https://lucide.dev/)

@@ -23,8 +23,9 @@ Replace seat map manual page refreshes with full-duplex live seat status broadca
                 (Seat turns green: BOOKED)                (Seat turns gray: BOOKED)
 ```
 
-* **Cross-Pod Broker:** Redis Pub/Sub fans out seat changes across horizontal backend instances.
-* **Handshake Security:** Validates existing Bearer JWT during the initial STOMP `CONNECT` frame.
+* **Status:** In-memory WebSocket/STOMP broker and frontend subscription implemented (see [`realtime-seat-sync.md`](realtime-seat-sync.md)).
+* **Next Extension (Clustered Redis Pub/Sub Broker):** When running multiple Spring Boot pods behind a load balancer, a booking on Pod 1 publishes to a Redis channel to fan out frames across all pods.
+* **Handshake Security:** Validate existing Bearer JWT during the initial STOMP `CONNECT` frame.
 
 ---
 

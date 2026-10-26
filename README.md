@@ -21,6 +21,7 @@ I built QuickTix to solve the high-concurrency ticket drop challenge: ensuring t
 [ Spring Boot 4 Application Service ] (Port 8080)
    ├── Security Filter Chain: Stateless JwtAuthFilter & Centralized CORS
    ├── Web Layer: DTO validation via Jakarta @Valid & Swagger OpenAPI
+   ├── WebSocket Broker: STOMP over /ws with SockJS fallback & /topic/event.{id}
    ├── Rate Limiting Layer: Bucket4j + Lettuce / Redis 7 (Anti-scalping bot shield)
    ├── Caching Layer: Redis Cache Manager (@Cacheable hot paths & @CacheEvict)
    ├── Business Layer: Atomic @Transactional reservations & ownership guards
@@ -94,9 +95,10 @@ I documented each core subsystem in detail within the **[architecture/](architec
 * **[Distributed Caching Layer](architecture/distributed-caching.md)**: Sub-20ms catalog reads via Redis 7, deterministic `@CacheEvict` invalidation, 5-minute safety TTL, and fail-open `CacheErrorConfig`.
 * **[Distributed Rate Limiting](architecture/distributed-rate-limiting.md)**: Bucket4j + Lettuce anti-scalping bot protection on `POST /api/bookings` with per-user (burst 5) and per-IP (burst 10) limits.
 * **[Security & Dual-Token Auth](architecture/security-and-auth.md)**: In-memory 15-minute access tokens, Secure HttpOnly 7-day refresh cookies, SHA-256 database token hashing, and session family reuse detection.
+* **[Real-Time Seat Synchronization](architecture/realtime-seat-sync.md)**: Full-duplex STOMP WebSocket broker on `/ws` broadcasting live seat status updates (`AVAILABLE`, `HELD`, `BOOKED`) to `/topic/event.{eventId}` without page refresh.
 * **[Production Containerization](architecture/containerization.md)**: Multi-stage Alpine Docker build achieving a 50.1% container size reduction (from 870 MB down to 434 MB).
-* **[Future Architectural Roadmap](architecture/future-roadmap.md)**: Blueprints for WebSocket live seat maps, centralized ELK logging, automated CI/CD, and k6 load testing.
-* **[Verification & Benchmark Scripts](scripts/README.md)**: Standalone test harnesses for concurrency collision testing (`race.mjs`), Redis latency benchmarking (`latency.mjs`), and cache invalidation verification (`check-eviction.mjs`).
+* **[Future Architectural Roadmap](architecture/future-roadmap.md)**: Blueprints for clustered Redis Pub/Sub brokers, Prometheus/Grafana metrics, automated CI/CD, and k6 load testing.
+* **[Verification & Benchmark Scripts](scripts/README.md)**: Standalone test harnesses for concurrency collision testing (`race.mjs`), Redis latency benchmarking (`latency.mjs`), cache invalidation verification (`check-eviction.mjs`), and rate limit verification (`rate-limit.mjs`).
 
 ---
 
@@ -106,12 +108,14 @@ I documented each core subsystem in detail within the **[architecture/](architec
 | :--- | :--- | :--- |
 | **Backend Runtime** | Java 25 | LTS features, virtual thread readiness, modern syntax |
 | **Backend Framework** | Spring Boot 4.0 | REST API, Spring Security, Spring Cache, Spring Data JPA |
+| **Real-Time Messaging** | Spring WebSocket & STOMP | Full-duplex live seat status fan-out to connected attendees |
 | **Distributed Store** | Redis 7 & Lettuce | Sub-millisecond catalog caching, atomic Bucket4j rate limiting |
 | **Database Engine** | PostgreSQL 16 | ACID transactional persistence, relational integrity, indexes |
 | **ORM & Concurrency** | Hibernate 7 | Predicate-level optimistic locking via `@Version` |
 | **API Documentation** | springdoc-openapi 2.8 | OpenAPI 3.0 specification, interactive Swagger UI dashboard |
 | **Containerization** | Docker & Compose | Optimized multi-stage build, healthcheck-driven service orchestration |
 | **Frontend Client** | React 19 & Vite 6 | Fast HMR bundling, interactive venue seat picker, responsive design |
+| **Client Real-Time** | @stomp/stompjs | WebSocket STOMP subscription on `/topic/event.{id}` |
 | **Client Routing** | React Router 6 | Declarative role guards (`USER`, `ORGANIZER`, `ADMIN`) |
 | **Client Auth & HTTP** | Axios Interceptors | In-memory token management, silent HttpOnly refresh queueing |
 

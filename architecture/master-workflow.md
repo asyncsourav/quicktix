@@ -43,7 +43,7 @@
 [ 6. Persistence & Concurrency Control (PostgreSQL 16) ]
      ├── Optimistic Locking: Hibernate @Version check on Seat (WHERE id=? AND version=?)
      ├── ACID Commit: Commit booking or trigger atomic batch rollback on collision
-     └── Database Integrity: Relational foreign keys and unique constraints
+     └── Real-Time Broadcast: SimpMessagingTemplate pushes status to /topic/event.{id}
              │
              ▼
 [ 7. Response Dispatch ]
