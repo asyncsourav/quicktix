@@ -3,6 +3,7 @@
 package com.asyncsourav.quicktix.service;
 
 
+import com.asyncsourav.quicktix.dto.email.BookingConfirmationEmailDetails;
 import com.asyncsourav.quicktix.dto.request.BookingRequest;
 import com.asyncsourav.quicktix.dto.response.BookingResponse;
 import com.asyncsourav.quicktix.dto.response.SeatStatusUpdate;
@@ -38,6 +39,7 @@ public class BookingService {
     private final SeatRepository seatRepository;
     private final UserRepository userRepository;
     private final SeatBroadcastService seatBroadcastService;
+    private final EmailService emailService;
 
 
 
@@ -124,6 +126,19 @@ public class BookingService {
                 ))
                 .toList();
         seatBroadcastService.broadcastSeatStatusBatch(event.getId(), updates);
+
+        // Asynchronously dispatch booking confirmation email (never blocks the HTTP 201 response)
+        BookingConfirmationEmailDetails emailDetails = new BookingConfirmationEmailDetails(
+                user.getEmail(),
+                user.getName(),
+                savedBooking.getId(),
+                event.getTitle(),
+                event.getStartTime(),
+                event.getVenue() != null ? event.getVenue().getName() : "TBD",
+                requestedSeats.stream().map(Seat::getSeatLabel).toList(),
+                totalAmount
+        );
+        emailService.sendBookingConfirmation(emailDetails);
 
         return BookingResponse.fromEntity(savedBooking);
     }
@@ -234,6 +249,17 @@ public class BookingService {
                     .toList();
 
             seatBroadcastService.broadcastSeatStatusBatch(eventId, releaseUpdates);
+        }
+
+        // Asynchronously dispatch cancellation notice email
+        if (booking.getUser() != null && booking.getEvent() != null) {
+            emailService.sendBookingCancellation(
+                    booking.getUser().getEmail(),
+                    booking.getUser().getName(),
+                    booking.getId(),
+                    booking.getEvent().getTitle(),
+                    seats.stream().map(Seat::getSeatLabel).toList()
+            );
         }
 
         return BookingResponse.fromEntity(updatedBooking);
