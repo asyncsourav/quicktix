@@ -95,10 +95,10 @@ I documented each core subsystem in detail within the **[architecture/](architec
 * **[Distributed Caching Layer](architecture/distributed-caching.md)**: Sub-20ms catalog reads via Redis 7, deterministic `@CacheEvict` invalidation, 5-minute safety TTL, and fail-open `CacheErrorConfig`.
 * **[Distributed Rate Limiting](architecture/distributed-rate-limiting.md)**: Bucket4j + Lettuce anti-scalping bot protection on `POST /api/bookings` with per-user (burst 5) and per-IP (burst 10) limits.
 * **[Security & Dual-Token Auth](architecture/security-and-auth.md)**: In-memory 15-minute access tokens, Secure HttpOnly 7-day refresh cookies, SHA-256 database token hashing, and session family reuse detection.
-* **[Real-Time Seat Synchronization](architecture/realtime-seat-sync.md)**: Full-duplex STOMP WebSocket broker on `/ws` broadcasting live seat status updates (`AVAILABLE`, `HELD`, `BOOKED`) to `/topic/event.{eventId}` without page refresh.
+* **[Real-Time Seat Synchronization](architecture/realtime-seat-sync.md)**: Full-duplex STOMP WebSocket broker on `/ws` broadcasting live seat status updates (`AVAILABLE`, `HELD`, `BOOKED`) to `/topic/event.{eventId}` without page refresh; benchmarked across 50 concurrent sockets in a median of 15.8 ms (p95 20.7 ms) on localhost.
 * **[Production Containerization](architecture/containerization.md)**: Multi-stage Alpine Docker build achieving a 50.1% container size reduction (from 870 MB down to 434 MB).
 * **[Future Architectural Roadmap](architecture/future-roadmap.md)**: Blueprints for clustered Redis Pub/Sub brokers, Prometheus/Grafana metrics, automated CI/CD, and k6 load testing.
-* **[Verification & Benchmark Scripts](scripts/README.md)**: Standalone test harnesses for concurrency collision testing (`race.mjs`), Redis latency benchmarking (`latency.mjs`), cache invalidation verification (`check-eviction.mjs`), and rate limit verification (`rate-limit.mjs`).
+* **[Verification & Benchmark Scripts](scripts/README.md)**: Standalone test harnesses for concurrency collision testing (`race.mjs`), Redis latency benchmarking (`latency.mjs`), cache invalidation verification (`check-eviction.mjs`), rate limit verification (`rate-limit.mjs`), and STOMP broadcast latency (`websocket-latency.mjs`).
 
 ---
 

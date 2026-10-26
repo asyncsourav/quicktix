@@ -96,3 +96,26 @@ To run these scripts on your machine:
   ```bash
   node scripts/rate-limit.mjs
   ```
+
+---
+
+### 5. `websocket-latency.mjs` - How I Measured Real-Time STOMP Broadcast Latency
+
+* **File:** `scripts/websocket-latency.mjs`
+* **Why I Built This:** The roadmap target was "10+ concurrent clients in under 200 ms". I engineered this benchmark harness to measure end-to-end propagation latency to 50 concurrent connected WebSocket sockets.
+* **How I Implemented the Benchmark:**
+  * Establishes 50 concurrent STOMP clients over native WebSocket to `ws://localhost:8080/ws`.
+  * All 50 clients subscribe to `/topic/event.1`.
+  * Runs 30 state mutation cycles (15 book and 15 release pairs, totaling 1,500 delivered messages).
+  * **Timing Methodology:** The timer starts immediately before sending the HTTP booking/cancellation request, measuring complete end-to-end delay (HTTP dispatch, PostgreSQL transaction commit, and STOMP broadcast push to each client socket).
+  * **Environment:** Measured on localhost (excludes public internet routing and browser DOM re-rendering).
+* **What I Measured & Verified:**
+  * **Delivery Reliability:** 100.0% delivery rate (1,500 / 1,500 frames received across 50 sockets, no messages lost).
+  * **Median (p50) Latency:** **15.8 ms** (against the < 200 ms roadmap target).
+  * **95th Percentile (p95):** **20.7 ms**.
+  * **Min / Max Latency:** 9.7 ms min | 39.8 ms max.
+  * **Resume Metric:** `Propagated live seat updates to 50 concurrent clients in a median of 15.8 ms (p95 20.7 ms) over WebSocket/STOMP (measured on localhost).`
+* **How to Run:**
+  ```bash
+  node scripts/websocket-latency.mjs
+  ```

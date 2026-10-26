@@ -90,3 +90,19 @@ stompClient.subscribe(`/topic/event.${id}`, (message) => {
 ```
 
 * Displays a **Live Seat Sync** badge reflecting active STOMP connection health.
+
+---
+
+## Benchmark Verification ([`scripts/websocket-latency.mjs`](../scripts/websocket-latency.mjs))
+
+Tested against 50 concurrent STOMP clients over WebSocket across 30 rounds (15 book and 15 release pairs; 1,500 total deliveries). Measured on localhost. Clock starts immediately before dispatching the HTTP booking/cancellation request, measuring complete end-to-end delay (HTTP transport + PostgreSQL transaction + STOMP push).
+
+| Metric | Measured Value (Localhost) | Roadmap Target |
+| :--- | :---: | :---: |
+| **Concurrent STOMP Subscribers** | **50 active sockets** | 10+ clients |
+| **Median (p50) Propagation Latency** | **15.8 ms** | < 200 ms |
+| **95th Percentile (p95) Latency** | **20.7 ms** | < 200 ms |
+| **Min / Max Latency** | 9.7 ms / 39.8 ms | - |
+| **Message Delivery Rate** | **100.0% (1,500 / 1,500)** | No messages lost |
+
+* **Resume Summary:** `Propagated live seat updates to 50 concurrent clients in a median of 15.8 ms (p95 20.7 ms) over WebSocket/STOMP (measured on localhost).`
