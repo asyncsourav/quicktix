@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Client } from '@stomp/stompjs';
 import api from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { MapPin, Calendar, Check, AlertCircle, ArrowLeft } from 'lucide-react';
@@ -16,9 +17,72 @@ export default function EventDetailPage() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [successBooking, setSuccessBooking] = useState(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
   useEffect(() => {
     fetchEventAndSeats();
+
+    // Configure STOMP WebSocket client for real-time seat status updates
+    const isHttps = window.location.protocol === 'https:';
+    const wsProtocol = isHttps ? 'wss:' : 'ws:';
+    const brokerURL =
+      import.meta.env.VITE_WS_URL ||
+      `${wsProtocol}//${window.location.hostname}:8080/ws`;
+
+    const stompClient = new Client({
+      brokerURL,
+      reconnectDelay: 3000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+      onConnect: () => {
+        setWsConnected(true);
+
+        // Subscribe to live seat transitions (AVAILABLE, HELD, BOOKED) for this event
+        stompClient.subscribe(`/topic/event.${id}`, (message) => {
+          try {
+            const data = JSON.parse(message.body);
+            const updates = Array.isArray(data) ? data : [data];
+
+            // Update seat state dynamically without reloading the page
+            setSeats((prevSeats) => {
+              const updateMap = new Map(updates.map((u) => [u.seatId, u.status]));
+              return prevSeats.map((seat) =>
+                updateMap.has(seat.id)
+                  ? { ...seat, status: updateMap.get(seat.id) }
+                  : seat
+              );
+            });
+
+            // Automatically deselect if another user claimed the seat
+            setSelectedSeatIds((prevSelected) =>
+              prevSelected.filter(
+                (seatId) =>
+                  !updates.some(
+                    (u) => u.seatId === seatId && u.status !== 'AVAILABLE'
+                  )
+              )
+            );
+          } catch (err) {
+            console.error('Failed to parse incoming seat status update:', err);
+          }
+        });
+      },
+      onDisconnect: () => {
+        setWsConnected(false);
+      },
+      onStompError: (frame) => {
+        console.warn('STOMP broker error:', frame.headers['message']);
+      },
+      onWebSocketClose: () => {
+        setWsConnected(false);
+      },
+    });
+
+    stompClient.activate();
+
+    return () => {
+      stompClient.deactivate();
+    };
   }, [id]);
 
   const fetchEventAndSeats = async () => {
@@ -111,6 +175,26 @@ export default function EventDetailPage() {
           <div>
             <div className="flex items-center gap-2" style={{ marginBottom: '6px' }}>
               <span className="badge badge-primary">{event.category}</span>
+              <span
+                className={`badge ${wsConnected ? 'badge-success' : 'badge-muted'}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                }}
+              >
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: wsConnected ? 'var(--success)' : 'var(--text-dim)',
+                  }}
+                />
+                {wsConnected ? 'Live Seat Sync' : 'Sync Connecting...'}
+              </span>
             </div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{event.title}</h1>
             <div className="flex items-center gap-5" style={{ fontSize: '13px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>

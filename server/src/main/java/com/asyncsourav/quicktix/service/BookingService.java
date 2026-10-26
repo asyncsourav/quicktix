@@ -5,6 +5,7 @@ package com.asyncsourav.quicktix.service;
 
 import com.asyncsourav.quicktix.dto.request.BookingRequest;
 import com.asyncsourav.quicktix.dto.response.BookingResponse;
+import com.asyncsourav.quicktix.dto.response.SeatStatusUpdate;
 import com.asyncsourav.quicktix.entity.*;
 import com.asyncsourav.quicktix.exception.BadRequestException;
 import com.asyncsourav.quicktix.exception.ResourceNotFoundException;
@@ -36,6 +37,8 @@ public class BookingService {
     private final EventRepository eventRepository;
     private final SeatRepository seatRepository;
     private final UserRepository userRepository;
+    private final SeatBroadcastService seatBroadcastService;
+
 
 
     /**
@@ -111,8 +114,21 @@ public class BookingService {
         log.info("Booking ID: {} confirmed for user: {} with {} seats. Total: {}",
                 savedBooking.getId(), userEmail, requestedSeats.size(), totalAmount);
 
+        // Broadcast real-time seat BOOKED updates to all connected subscribers of /topic/event.{eventId}
+        List<SeatStatusUpdate> updates = requestedSeats.stream()
+                .map(seat -> new SeatStatusUpdate(
+                        seat.getId(), 
+                        seat.getSeatLabel(), 
+                        SeatStatus.BOOKED, 
+                        event.getId()
+                ))
+                .toList();
+        seatBroadcastService.broadcastSeatStatusBatch(event.getId(), updates);
+
         return BookingResponse.fromEntity(savedBooking);
     }
+
+
 
     /**
      * Retrieves all bookings made by the authenticated user (newest first).
@@ -127,6 +143,8 @@ public class BookingService {
                 .map(BookingResponse::fromEntity)
                 .toList();
     }
+
+
 
     /**
      * Retrieves a booking by ID. Restricted to owner or ADMIN.
@@ -149,6 +167,8 @@ public class BookingService {
         return BookingResponse.fromEntity(booking);
     }
 
+
+
     /**
      * Cancels a booking and releases all its reserved seats back to AVAILABLE.
      */
@@ -156,13 +176,24 @@ public class BookingService {
     public BookingResponse cancelBooking(Long id, String userEmail) {
         
         Booking booking = bookingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", id));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Booking", 
+                        "id", 
+                        id
+                ));
+
 
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", userEmail));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User", 
+                        "email", 
+                        userEmail
+                ));
+
 
         boolean isAdmin = user.getRole() == Role.ADMIN;
         boolean isOwner = booking.getUser().getId().equals(user.getId());
+
 
         if (!isAdmin && !isOwner) {
             throw new AccessDeniedException("You do not have permission to cancel this booking.");
@@ -182,8 +213,28 @@ public class BookingService {
         }
         seatRepository.saveAll(seats);
 
+
         Booking updatedBooking = bookingRepository.save(booking);
-        log.info("Booking ID: {} cancelled by: {}. Released {} seats.", id, userEmail, seats.size());
+        log.info(
+                "Booking ID: {} cancelled by: {}. Released {} seats.", 
+                id, 
+                userEmail, 
+                seats.size()
+        );
+
+        // Broadcast real-time seat AVAILABLE (release) updates to all connected subscribers of /topic/event.{eventId}
+        if (booking.getEvent() != null) {
+            Long eventId = booking.getEvent().getId();
+            List<SeatStatusUpdate> releaseUpdates = seats.stream()
+                    .map(seat -> new SeatStatusUpdate(
+                            seat.getId(), 
+                            seat.getSeatLabel(), 
+                            SeatStatus.AVAILABLE, 
+                            eventId))
+                    .toList();
+
+            seatBroadcastService.broadcastSeatStatusBatch(eventId, releaseUpdates);
+        }
 
         return BookingResponse.fromEntity(updatedBooking);
     }
