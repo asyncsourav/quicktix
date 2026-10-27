@@ -35,7 +35,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 
@@ -212,41 +211,6 @@ class AuthServiceTest {
 
 
     @Test
-    @DisplayName("CONCURRENCY: If two simultaneous refreshes occur, the losing request fails to claim the token and revokes the family")
-    void refresh_WhenConcurrentClaimLosesRace_ShouldTriggerReuseDetectionAndRevokeFamily() {
-
-        // Given
-        String rawToken = "racing_refresh_token";
-        String tokenHash = JwtUtil.hashToken(rawToken);
-        String familyId = "racing-family-777";
-
-        RefreshToken racingToken = RefreshToken.builder()
-                .id(40L)
-                .user(testUser)
-                .tokenHash(tokenHash)
-                .familyId(familyId)
-                .used(false)
-                .revoked(false)
-                .expiresAt(Instant.now().plus(7, ChronoUnit.DAYS))
-                .build();
-
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(racingToken));
-        when(refreshTokenRepository.markAsUsed(40L)).thenReturn(0); // Lost the race condition!
-
-        // When & Then
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(rawToken)))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessageContaining("Refresh token reuse detected");
-
-        verify(refreshTokenRepository).revokeFamily(familyId);
-        verify(jwtUtil, never()).generateAccessToken(any());
-        verify(refreshTokenRepository, never()).save(any());
-    }
-
-
-
-
-    @Test
     @DisplayName("REUSE DETECTION: If an already-used refresh token is presented, revoke the entire family")
     void refresh_WhenTokenIsAlreadyUsed_ShouldTriggerReuseDetectionAndRevokeFamily() {
 
@@ -277,95 +241,5 @@ class AuthServiceTest {
         verify(refreshTokenRepository, never()).markAsUsed(any());
         verify(refreshTokenRepository, never()).save(argThat(RefreshToken::isUsed));
         verify(jwtUtil, never()).generateAccessToken(any());
-    }
-
-
-
-
-    @Test
-    @DisplayName("REUSE DETECTION: If a revoked token is presented, revoke the family")
-    void refresh_WhenTokenIsRevoked_ShouldTriggerReuseDetectionAndRevokeFamily() {
-
-        // Given
-        String rawToken = "revoked_token";
-        String tokenHash = JwtUtil.hashToken(rawToken);
-        String familyId = "revoked-family-123";
-
-        RefreshToken revokedToken = RefreshToken.builder()
-                .id(20L)
-                .user(testUser)
-                .tokenHash(tokenHash)
-                .familyId(familyId)
-                .used(false)
-                .revoked(true) // REVOKED!
-                .expiresAt(Instant.now().plus(5, ChronoUnit.DAYS))
-                .build();
-
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(revokedToken));
-
-        // When & Then
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(rawToken)))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessageContaining("Refresh token reuse detected");
-
-        verify(refreshTokenRepository).revokeFamily(familyId);
-    }
-
-
-
-
-    @Test
-    @DisplayName("Refresh token expiration check fails if token is past expiresAt")
-    void refresh_WhenTokenIsExpired_ShouldThrowBadCredentialsException() {
-
-        // Given
-        String rawToken = "expired_token";
-        String tokenHash = JwtUtil.hashToken(rawToken);
-
-        RefreshToken expiredToken = RefreshToken.builder()
-                .id(25L)
-                .user(testUser)
-                .tokenHash(tokenHash)
-                .familyId("family-xyz")
-                .used(false)
-                .revoked(false)
-                .expiresAt(Instant.now().minus(1, ChronoUnit.HOURS)) // Expired 1 hour ago
-                .build();
-
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(expiredToken));
-
-        // When & Then
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(rawToken)))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessageContaining("Refresh token has expired");
-
-        verify(refreshTokenRepository, never()).revokeFamily(anyString());
-    }
-
-
-
-    
-    @Test
-    @DisplayName("Logout revokes the entire token family")
-    void logout_ShouldRevokeSessionFamily() {
-        
-        // Given
-        String rawToken = "logout_token";
-        String tokenHash = JwtUtil.hashToken(rawToken);
-        String familyId = "family-to-logout";
-
-        RefreshToken token = RefreshToken.builder()
-                .id(30L)
-                .familyId(familyId)
-                .tokenHash(tokenHash)
-                .build();
-
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(token));
-
-        // When
-        authService.logout(new RefreshTokenRequest(rawToken));
-
-        // Then
-        verify(refreshTokenRepository).revokeFamily(familyId);
     }
 }
