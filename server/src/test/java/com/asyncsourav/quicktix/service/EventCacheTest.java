@@ -4,6 +4,8 @@ package com.asyncsourav.quicktix.service;
 
 
 
+import com.asyncsourav.quicktix.BaseIntegrationTest;
+import com.asyncsourav.quicktix.config.DataInitializer;
 import com.asyncsourav.quicktix.dto.response.EventResponse;
 import com.asyncsourav.quicktix.entity.Event;
 import com.asyncsourav.quicktix.entity.Role;
@@ -14,9 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -30,9 +30,7 @@ import static org.mockito.Mockito.*;
 
 
 
-@SpringBootTest
-@ActiveProfiles("dev")
-class EventCacheTest {
+class EventCacheTest extends BaseIntegrationTest {
 
 
     @Autowired
@@ -43,6 +41,9 @@ class EventCacheTest {
 
     @MockitoBean
     private EventRepository eventRepository;
+
+    @MockitoBean
+    private DataInitializer dataInitializer;
 
     private Event testEvent;
 

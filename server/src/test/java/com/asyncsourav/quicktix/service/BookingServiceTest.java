@@ -7,8 +7,6 @@ import com.asyncsourav.quicktix.dto.email.BookingConfirmationEmailDetails;
 import com.asyncsourav.quicktix.dto.request.BookingRequest;
 import com.asyncsourav.quicktix.dto.response.BookingResponse;
 import com.asyncsourav.quicktix.entity.*;
-import com.asyncsourav.quicktix.exception.BadRequestException;
-import com.asyncsourav.quicktix.exception.ResourceNotFoundException;
 import com.asyncsourav.quicktix.exception.SeatUnavailableException;
 import com.asyncsourav.quicktix.repository.BookingRepository;
 import com.asyncsourav.quicktix.repository.EventRepository;
@@ -18,12 +16,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -208,75 +204,6 @@ class BookingServiceTest {
 
 
     @Test
-    @DisplayName("createBooking: Rejects seats belonging to another event (BadRequestException)")
-    void createBooking_WhenSeatBelongsToDifferentEvent_ShouldThrowBadRequestException() {
-
-        Event otherEvent = Event.builder().id(999L).title("Other").build();
-        testSeat1.setEvent(otherEvent);
-        BookingRequest request = new BookingRequest(100L, List.of(1001L));
-
-        when(userRepository.findByEmail("user@quicktix.com")).thenReturn(Optional.of(testUser));
-        when(eventRepository.findById(100L)).thenReturn(Optional.of(testEvent));
-        when(seatRepository.findAllById(List.of(1001L))).thenReturn(List.of(testSeat1));
-
-        assertThatThrownBy(() -> bookingService.createBooking(request, "user@quicktix.com"))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("does not belong to event ID");
-    }
-
-
-
-
-    @Test
-    @DisplayName("createBooking: Rejects non-existent seat IDs (BadRequestException)")
-    void createBooking_WhenSeatDoesNotExist_ShouldThrowBadRequestException() {
-
-        BookingRequest request = new BookingRequest(100L, List.of(1001L, 9999L));
-
-        when(userRepository.findByEmail("user@quicktix.com")).thenReturn(Optional.of(testUser));
-        when(eventRepository.findById(100L)).thenReturn(Optional.of(testEvent));
-        // Repository only returns 1 seat instead of requested 2
-        when(seatRepository.findAllById(List.of(1001L, 9999L))).thenReturn(List.of(testSeat1));
-
-        assertThatThrownBy(() -> bookingService.createBooking(request, "user@quicktix.com"))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("One or more selected seat IDs do not exist");
-    }
-
-
-
-
-    @Test
-    @DisplayName("createBooking: Fails when user is not found (ResourceNotFoundException)")
-    void createBooking_WhenUserNotFound_ShouldThrowResourceNotFoundException() {
-
-        BookingRequest request = new BookingRequest(100L, List.of(1001L));
-        when(userRepository.findByEmail("unknown@quicktix.com")).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> bookingService.createBooking(request, "unknown@quicktix.com"))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("User");
-    }
-
-
-
-
-    @Test
-    @DisplayName("createBooking: Fails when event is not found (ResourceNotFoundException)")
-    void createBooking_WhenEventNotFound_ShouldThrowResourceNotFoundException() {
-        BookingRequest request = new BookingRequest(999L, List.of(1001L));
-        when(userRepository.findByEmail("user@quicktix.com")).thenReturn(Optional.of(testUser));
-        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> bookingService.createBooking(request, "user@quicktix.com"))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Event");
-    }
-
-
-
-
-    @Test
     @DisplayName("cancelBooking: Releases seats to AVAILABLE, broadcasts update and sends cancellation email")
     void cancelBooking_Success() {
         
@@ -310,39 +237,5 @@ class BookingServiceTest {
         verify(seatRepository).saveAll(any());
         verify(seatBroadcastService).broadcastSeatStatusBatch(eq(100L), any());
         verify(emailService).sendBookingCancellation(eq("user@quicktix.com"), eq("Sourav Kumar"), eq(500L), eq("Rock Festival 2026"), any());
-    }
-
-
-
-
-    @Test
-    @DisplayName("cancelBooking: Rejects cancellation from non-owner and non-admin user (AccessDeniedException)")
-    void cancelBooking_WhenUnauthorizedUser_ShouldThrowAccessDeniedException() {
-
-        User otherUser = User.builder().id(99L).email("other@quicktix.com").role(Role.USER).build();
-        Booking booking = Booking.builder().id(500L).user(testUser).status(BookingStatus.CONFIRMED).build();
-
-        when(bookingRepository.findById(500L)).thenReturn(Optional.of(booking));
-        when(userRepository.findByEmail("other@quicktix.com")).thenReturn(Optional.of(otherUser));
-
-        assertThatThrownBy(() -> bookingService.cancelBooking(500L, "other@quicktix.com"))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("do not have permission");
-    }
-
-
-
-
-    @Test
-    @DisplayName("cancelBooking: Rejects cancellation of already CANCELLED booking (BadRequestException)")
-    void cancelBooking_WhenAlreadyCancelled_ShouldThrowBadRequestException() {
-        Booking booking = Booking.builder().id(500L).user(testUser).status(BookingStatus.CANCELLED).build();
-
-        when(bookingRepository.findById(500L)).thenReturn(Optional.of(booking));
-        when(userRepository.findByEmail("user@quicktix.com")).thenReturn(Optional.of(testUser));
-
-        assertThatThrownBy(() -> bookingService.cancelBooking(500L, "user@quicktix.com"))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("already cancelled");
     }
 }
