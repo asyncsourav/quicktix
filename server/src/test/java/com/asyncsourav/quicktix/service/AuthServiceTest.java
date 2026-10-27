@@ -6,10 +6,13 @@ package com.asyncsourav.quicktix.service;
 
 import com.asyncsourav.quicktix.dto.request.LoginRequest;
 import com.asyncsourav.quicktix.dto.request.RefreshTokenRequest;
+import com.asyncsourav.quicktix.dto.request.RegisterRequest;
 import com.asyncsourav.quicktix.dto.response.AuthResponse;
+import com.asyncsourav.quicktix.dto.response.UserResponse;
 import com.asyncsourav.quicktix.entity.RefreshToken;
 import com.asyncsourav.quicktix.entity.Role;
 import com.asyncsourav.quicktix.entity.User;
+import com.asyncsourav.quicktix.exception.BadRequestException;
 import com.asyncsourav.quicktix.repository.RefreshTokenRepository;
 import com.asyncsourav.quicktix.repository.UserRepository;
 import com.asyncsourav.quicktix.security.JwtUtil;
@@ -70,6 +73,58 @@ class AuthServiceTest {
                 .passwordHash("hashed_password")
                 .role(Role.USER)
                 .build();
+    }
+
+
+
+
+    @Test
+    @DisplayName("Registration encodes password and persists user with role")
+    void register_ShouldHashPasswordAndSaveUser() {
+        // Given
+        RegisterRequest request = new RegisterRequest("Sourav Kumar", "sourav@gmail.com", "password123", Role.USER);
+        when(userRepository.existsByEmail("sourav@gmail.com")).thenReturn(false);
+        when(passwordEncoder.encode("password123")).thenReturn("hashed_password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(1L);
+            return u;
+        });
+
+        // When
+        UserResponse response = authService.register(request);
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.email()).isEqualTo("sourav@gmail.com");
+        assertThat(response.name()).isEqualTo("Sourav Kumar");
+        assertThat(response.role()).isEqualTo(Role.USER);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User saved = userCaptor.getValue();
+        assertThat(saved.getPasswordHash()).isEqualTo("hashed_password");
+        assertThat(saved.getEmail()).isEqualTo("sourav@gmail.com");
+    }
+
+
+
+
+    @Test
+    @DisplayName("Registration rejects duplicate email with BadRequestException")
+    void register_WhenEmailAlreadyExists_ShouldThrowBadRequestException() {
+        // Given
+        RegisterRequest request = new RegisterRequest("Duplicate User", "sourav@gmail.com", "password123", Role.USER);
+        when(userRepository.existsByEmail("sourav@gmail.com")).thenReturn(true);
+
+        // When & Then
+        assertThatThrownBy(() -> authService.register(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("already registered");
+
+        verify(userRepository, never()).save(any());
+        verify(passwordEncoder, never()).encode(any());
     }
 
 
