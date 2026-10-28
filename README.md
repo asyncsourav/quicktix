@@ -54,8 +54,8 @@ All numbers come from the scripts in [`scripts/`](scripts/), run against the Doc
 | Sustained 4 requests/second for 10 s | 11 allowed, about 1 per second |
 | Live seat update to 50 WebSocket clients, 30 rounds | 1,500 of 1,500 delivered, median 15.8 ms, p95 20.7 ms |
 | Backend Docker image | 870 MB (single-stage) to 434 MB (multi-stage), about 50% smaller |
-| Automated test suite (JUnit 5 + Testcontainers) | 48 tests, 0 failures; verified 10-thread seat race & refresh CAS race in real PostgreSQL |
-| JaCoCo test coverage | **90.7% line coverage** on service logic, **71.1%** overall (excludes DTOs, entities, and configs) |
+| Automated test suite (JUnit 5 + Testcontainers) | 26 tests, 0 failures (JUnit 5, Mockito, Testcontainers for PostgreSQL & Redis) |
+| JaCoCo test coverage | **43.2% line coverage** on service logic, **39.8%** overall (excludes boilerplate DTOs, entities, and configs) |
 
 Notes: the cache gain is modest because PostgreSQL on localhost is already fast, and the WebSocket timer runs from the moment the booking request is sent to the moment each client receives the update. Both were measured on localhost, so a deployed setup will show different numbers.
 
@@ -116,7 +116,7 @@ quicktix/
 
 ## Status
 
-Working: everything above, including the 48-test automated suite (JUnit 5, Mockito, Testcontainers for real PostgreSQL and Redis) with 90.7% service-layer JaCoCo coverage. Next: CI pipeline (GitHub Actions) and hosted production deployment.
+Working: everything above, including the 26-test automated suite (JUnit 5, Mockito, Testcontainers for PostgreSQL and Redis) with JaCoCo coverage reporting. Next: CI pipeline (GitHub Actions) and hosted production deployment.
 
 ## Author
 

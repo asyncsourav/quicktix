@@ -102,14 +102,12 @@ The `Dockerfile` has two stages: Maven with a full JDK builds the jar, and a JRE
 
 ## Tests
 
-`./mvnw test` runs the 48-test suite (JUnit 5, Mockito, and Testcontainers against real PostgreSQL and Redis containers). 
+`./mvnw test` runs the 26-test suite (JUnit 5, Mockito, and Testcontainers against real PostgreSQL and Redis containers).
 
 - **Testcontainers Integration Tests (`BookingIntegrationTest`):**
-  - **Optimistic Locking Race:** 10 concurrent threads simultaneously attempt to book the exact same seat; exactly 1 succeeds and 9 fail with `409 Conflict` (verified rollback).
-  - **Token Refresh CAS Race:** Concurrent token refresh requests using the exact same raw token; atomic `WHERE used = false` ensures exactly 1 succeeds and the other fails without duplicate token issuance.
-  - End-to-end booking and cancellation workflows with seat state verification.
-- **Service Layer Unit Tests:** High-risk business logic across `BookingService`, `AuthService`, `EventService`, `RateLimiterService` (fail-open + 429), `SeatBroadcastService`, `VenueService`, `EmailService`, and `AdminService`.
+  - Full end-to-end booking lifecycle and cancellation workflows with seat state and transaction rollback verification.
+- **Service Layer Unit Tests:** High-risk business logic across `BookingService` (81.6% line coverage), `AuthService` (91.7% line coverage), and `EmailService` (58.8% line coverage).
 - **Coverage (JaCoCo):**
-  - **90.7% line coverage (91.1% instruction coverage)** on service-layer logic.
-  - **71.1% line coverage** across the overall application bundle.
-  - Excludes boilerplate by design (DTOs, JPA entities, configuration classes, and application bootstrap). Run `./mvnw verify` or `./mvnw test` to generate `target/site/jacoco/index.html`.
+  - **43.2% line coverage (41.6% instruction coverage)** on service-layer logic.
+  - **39.8% line coverage** across the overall application bundle.
+  - Excludes boilerplate by design (DTOs, JPA entities, configuration classes, and application bootstrap). Run `./mvnw verify` or `./mvnw test` to generate the interactive report at `target/site/jacoco/index.html`.

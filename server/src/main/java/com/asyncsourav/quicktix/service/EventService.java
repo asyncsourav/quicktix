@@ -162,7 +162,7 @@ public class EventService {
     /**
      * Retrieves a single event by ID.
      */
-    @Cacheable(value = "event", key = "#id")
+    @Cacheable(value = "event", key = "#id.toString()")
     @Transactional(readOnly = true)
     public EventResponse getEventById(Long id) {
 
@@ -205,7 +205,7 @@ public class EventService {
      */
     @Caching(evict = {
             @CacheEvict(value = "events", allEntries = true),
-            @CacheEvict(value = "event", key = "#id")
+            @CacheEvict(value = "event", key = "#id.toString()")
     })
     @Transactional
     public EventResponse updateEvent(Long id, EventCreateRequest request, String currentUserEmail) {
@@ -259,7 +259,7 @@ public class EventService {
      */
     @Caching(evict = {
             @CacheEvict(value = "events", allEntries = true),
-            @CacheEvict(value = "event", key = "#id")
+            @CacheEvict(value = "event", key = "#id.toString()")
     })
     @Transactional
     public void deleteEvent(Long id, String currentUserEmail) {
