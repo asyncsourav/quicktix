@@ -193,7 +193,7 @@ export default function EventDetailPage() {
                     background: wsConnected ? 'var(--success)' : 'var(--text-dim)',
                   }}
                 />
-                {wsConnected ? 'Live Seat Sync' : 'Sync Connecting...'}
+                {wsConnected ? 'WebSocket Sync Active' : 'Connecting Sync...'}
               </span>
             </div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '6px' }}>{event.title}</h1>

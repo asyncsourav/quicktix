@@ -1,1 +1,30 @@
+# Environment Variables
 .env
+.env.*
+!.env.example
+
+# Maven Build Artifacts
+target/
+**/target/
+
+# Frontend Build & Dependencies
+dist/
+**/dist/
+node_modules/
+**/node_modules/
+
+# IDE Configuration
+.idea/
+**/.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+**/.vscode/
+.classpath
+.project
+.settings/
+
+# OS Files
+.DS_Store
+Thumbs.db

@@ -40,24 +40,24 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err) {
-      setError(err.message || 'Demo login failed. Make sure backend is running.');
+      setError(err.message || 'Demo login failed. Make sure the backend server is running.');
     }
   };
 
   return (
     <div className="container" style={{ minHeight: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '28px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+      <div className="card" style={{ width: '100%', maxWidth: '420px', padding: '28px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '22px' }}>
           <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Sign In</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
-            Access your QuickTix account
+            Access your QuickTix account or use a test profile below.
           </p>
         </div>
 
         {/* Demo Login Quick-Select */}
         <div style={{ background: 'var(--bg)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '12px', marginBottom: '20px' }}>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}>
-            Quick Demo Accounts:
+            Pre-seeded Evaluation Profiles:
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
@@ -65,7 +65,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => handleDemoLogin('user@quicktix.com', 'password123')}
               className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '6px 4px', textAlign: 'center' }}
+              style={{ fontSize: '11.5px', padding: '6px 4px', textAlign: 'center' }}
             >
               Attendee
             </button>
@@ -73,7 +73,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => handleDemoLogin('organizer@quicktix.com', 'password123')}
               className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '6px 4px', textAlign: 'center' }}
+              style={{ fontSize: '11.5px', padding: '6px 4px', textAlign: 'center' }}
             >
               Organizer
             </button>
@@ -81,7 +81,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => handleDemoLogin('admin@quicktix.com', 'password123')}
               className="btn btn-secondary btn-sm"
-              style={{ fontSize: '11px', padding: '6px 4px', textAlign: 'center' }}
+              style={{ fontSize: '11.5px', padding: '6px 4px', textAlign: 'center' }}
             >
               Admin
             </button>
@@ -129,7 +129,7 @@ export default function LoginPage() {
             className="btn btn-primary"
             style={{ width: '100%', marginTop: '6px' }}
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
 

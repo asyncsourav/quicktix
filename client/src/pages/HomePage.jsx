@@ -10,10 +10,10 @@ import {
   Zap,
   Lock,
   Layers,
-  Sparkles,
   CheckCircle2,
   Database,
-  Ticket,
+  Cpu,
+  Radio,
 } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Concert', 'Sports', 'Theater', 'Conference', 'Comedy'];
@@ -55,58 +55,64 @@ export default function HomePage() {
           Hero Section
           ==================================================================== */}
       <section className="hero-section" aria-labelledby="hero-heading">
-        <div className="hero-glow" aria-hidden="true" />
         <div className="hero-content">
           <div className="hero-badge">
             <span className="hero-pulse-dot" />
-            <Sparkles size={14} color="var(--primary)" />
-            <span>Zero Double-Bookings Guaranteed • Redis 7 Speed</span>
+            <span>High Concurrency • Transactional Integrity • Real-Time State</span>
           </div>
 
           <h1 id="hero-heading" className="hero-title">
-            Ultra-Fast, <span className="gradient-text">Concurrency-Safe</span> Live Event Ticketing
+            Distributed Event Ticketing & <span className="gradient-text">Reservation System</span>
           </h1>
 
           <p className="hero-subtitle">
-            Engineered for high-volume ticket drops. Backed by PostgreSQL optimistic concurrency control,
-            sub-20ms Redis distributed caching, and real-time interactive seat reservation.
+            Engineered to eliminate race conditions and overselling during high-demand booking surges.
+            Powered by Spring Boot, PostgreSQL optimistic concurrency control, Redis distributed cache-aside,
+            and STOMP WebSocket seat synchronization.
           </p>
 
           <div className="hero-actions">
             <a href="#events" className="btn-hero-primary" id="hero-cta-explore">
-              <span>Explore Live Events</span>
-              <ArrowRight size={16} />
+              <span>Browse Events</span>
+              <ArrowRight size={15} />
             </a>
-            <Link to="/login" className="btn-hero-secondary" id="hero-cta-login">
-              <Ticket size={16} />
-              <span>Demo Access / Sign In</span>
-            </Link>
+            <a href="#architecture" className="btn-hero-secondary" id="hero-cta-architecture">
+              <span>System Architecture</span>
+            </a>
           </div>
 
-          {/* Stats Counters Strip */}
-          <div className="stats-grid" role="region" aria-label="Key Platform Metrics">
+          {/* System Technical Specifications Grid */}
+          <div className="stats-grid" role="region" aria-label="System Architectural Highlights">
             <div className="stat-card">
-              <div className="stat-num" style={{ color: 'var(--success)' }}>0</div>
-              <div className="stat-title">Double-Bookings</div>
-              <div className="stat-desc">Hibernate @Version locking prevents race collisions</div>
+              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
+                <ShieldCheck size={18} color="var(--primary)" />
+                <span className="stat-title">Optimistic Locking</span>
+              </div>
+              <div className="stat-desc">Hibernate @Version column ensures zero race collisions without database deadlocks.</div>
             </div>
 
             <div className="stat-card">
-              <div className="stat-num" style={{ color: 'var(--primary)' }}>&lt; 20ms</div>
-              <div className="stat-title">Read Latency</div>
-              <div className="stat-desc">In-memory Redis 7 cache with automatic @CacheEvict</div>
+              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
+                <Zap size={18} color="var(--primary)" />
+                <span className="stat-title">Redis Cache-Aside</span>
+              </div>
+              <div className="stat-desc">In-memory caching for event catalog reads with automated @CacheEvict triggers.</div>
             </div>
 
             <div className="stat-card">
-              <div className="stat-num">1,000+</div>
-              <div className="stat-title">Live Events</div>
-              <div className="stat-desc">Stress-tested dataset across multiple categories</div>
+              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
+                <Radio size={18} color="var(--primary)" />
+                <span className="stat-title">Live WebSocket Sync</span>
+              </div>
+              <div className="stat-desc">STOMP broker broadcasts seat transitions (AVAILABLE, HELD, BOOKED) in real time.</div>
             </div>
 
             <div className="stat-card">
-              <div className="stat-num" style={{ color: 'var(--warning)' }}>100%</div>
-              <div className="stat-title">ACID Isolation</div>
-              <div className="stat-desc">PostgreSQL transactional integrity with atomic claims</div>
+              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
+                <Lock size={18} color="var(--primary)" />
+                <span className="stat-title">Rotating JWT Auth</span>
+              </div>
+              <div className="stat-desc">Stateless access tokens paired with rotating HttpOnly refresh tokens in PostgreSQL.</div>
             </div>
           </div>
         </div>
@@ -118,15 +124,15 @@ export default function HomePage() {
       <section id="architecture" className="landing-section" aria-labelledby="arch-heading">
         <div className="section-head">
           <div className="section-tag">
-            <ShieldCheck size={13} />
-            <span>High-Concurrency Architecture</span>
+            <Layers size={13} />
+            <span>Core Architecture</span>
           </div>
           <h2 id="arch-heading" className="section-title">
-            Engineered to Eliminate Race Conditions
+            Engineered for Concurrency & Consistency
           </h2>
           <p className="section-desc">
-            Traditional ticketing platforms collapse under simultaneous booking spikes. QuickTix combines
-            versioned database isolation with distributed in-memory caching for zero overselling.
+            High-volume ticket sales create severe read and write contention. QuickTix addresses this with
+            explicit database versioning, in-memory catalog caching, and pub/sub seat state broadcasting.
           </p>
         </div>
 
@@ -134,13 +140,13 @@ export default function HomePage() {
           <div className="arch-card">
             <div>
               <div className="arch-icon-wrap">
-                <ShieldCheck size={22} />
+                <ShieldCheck size={20} />
               </div>
               <h3 className="arch-title">Optimistic Concurrency Control</h3>
               <p className="arch-text">
-                Every seat entity tracks an explicit version column. When multiple concurrent users attempt
-                to purchase the same seat, only the first transaction commits while subsequent requests receive
-                an instant, clean conflict rejection without database deadlocks.
+                Every Seat entity maintains an explicit version number. During checkout, Hibernate validates that
+                the seat's version has not changed. If concurrent requests target the same seat, exactly one transaction
+                commits while conflicting requests fail gracefully with an ObjectOptimisticLockingFailureException.
               </p>
             </div>
             <div className="arch-pill">
@@ -152,100 +158,101 @@ export default function HomePage() {
           <div className="arch-card">
             <div>
               <div className="arch-icon-wrap">
-                <Zap size={22} />
+                <Zap size={20} />
               </div>
-              <h3 className="arch-title">Sub-Millisecond Redis 7 Caching</h3>
+              <h3 className="arch-title">Distributed Cache-Aside Strategy</h3>
               <p className="arch-text">
-                High-throughput catalog queries are served from Redis with a 5-minute safety TTL. Whenever an
-                event is created, updated, or removed, Spring Cache executes selective @CacheEvict triggers to
-                guarantee data freshness without stale reads.
+                Event catalog queries are served directly from an in-memory Redis cluster with a 5-minute safety TTL.
+                Whenever an organizer creates, updates, or deletes an event, Spring executes selective @CacheEvict
+                rules to guarantee data freshness across replicas without serving stale data.
               </p>
             </div>
             <div className="arch-pill">
               <Zap size={12} />
-              <span>Redis 7 • In-Memory Acceleration</span>
+              <span>Redis 7 • Spring Cache</span>
             </div>
           </div>
 
           <div className="arch-card">
             <div>
               <div className="arch-icon-wrap">
-                <Lock size={22} />
+                <Lock size={20} />
               </div>
-              <h3 className="arch-title">Bank-Grade Token Security</h3>
+              <h3 className="arch-title">Secure Dual-Token Authentication</h3>
               <p className="arch-text">
-                Short-lived JWT access tokens reside exclusively in frontend JavaScript memory. Refresh tokens are
-                transmitted via Secure HttpOnly cookies and tracked in PostgreSQL with family reuse detection and
-                atomic token rotation statements.
+                Short-lived JWT access tokens reside strictly in frontend JavaScript memory to protect against XSS.
+                Refresh tokens are delivered via secure HttpOnly cookies and tracked in PostgreSQL with session
+                family identification and automatic invalidation upon reuse detection.
               </p>
             </div>
             <div className="arch-pill">
               <Lock size={12} />
-              <span>HttpOnly Cookies • Dual Rotating JWTs</span>
+              <span>HttpOnly Cookies • Family Rotation</span>
             </div>
           </div>
 
           <div className="arch-card">
             <div>
               <div className="arch-icon-wrap">
-                <Layers size={22} />
+                <Radio size={20} />
               </div>
-              <h3 className="arch-title">Interactive Seat Selection Engine</h3>
+              <h3 className="arch-title">STOMP WebSocket Seat Broadcasting</h3>
               <p className="arch-text">
-                Visual seat grids reflect live seat availability with distinct visual states: Available, Held,
-                and Booked. Immediate real-time seat reservation guarantees zero surprises during checkout.
+                When a seat changes status during booking or cancellation, the service publishes a lightweight payload
+                to /topic/event.{'{id}'}. Connected clients update their local seat map immediately, eliminating
+                unnecessary polling and preventing stale selections.
               </p>
             </div>
             <div className="arch-pill">
-              <Layers size={12} />
-              <span>Dynamic Venue Layouts • Live State</span>
+              <Cpu size={12} />
+              <span>Spring WebSocket • STOMP Protocol</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* ====================================================================
-          How It Works Section
+          Concurrency Flow Section
           ==================================================================== */}
-      <section id="how-it-works" className="landing-section" aria-labelledby="steps-heading">
+      <section id="concurrency-flow" className="landing-section" aria-labelledby="flow-heading">
         <div className="section-head">
           <div className="section-tag">
             <CheckCircle2 size={13} />
-            <span>Frictionless Workflow</span>
+            <span>Transaction Lifecycle</span>
           </div>
-          <h2 id="steps-heading" className="section-title">
-            How QuickTix Works in 3 Steps
+          <h2 id="flow-heading" className="section-title">
+            Booking Concurrency Execution Flow
           </h2>
           <p className="section-desc">
-            From discovering events to securing your seats with transactional certainty.
+            How a seat reservation progresses through database transaction boundaries and conflict detection.
           </p>
         </div>
 
         <div className="step-grid">
           <div className="step-card">
             <div className="step-num">01</div>
-            <h3 className="step-title">Discover & Filter</h3>
+            <h3 className="step-title">Seat Selection & Payload Submission</h3>
             <p className="step-desc">
-              Browse concerts, sports, theater, and conferences with instant keyword search and category filters.
-              Catalog reads are cached in Redis for instantaneous page loads.
+              The attendee selects available seats on the interactive venue grid. The client dispatches a validated
+              payload containing event and seat identifiers to the booking service endpoint.
             </p>
           </div>
 
           <div className="step-card">
             <div className="step-num">02</div>
-            <h3 className="step-title">Pick Your Seats</h3>
+            <h3 className="step-title">Transactional Boundary & Version Check</h3>
             <p className="step-desc">
-              Inspect the venue seat layout. Choose your preferred seats with live seat availability indicators and
-              instant dynamic price computation.
+              Within a @Transactional boundary, the backend validates seat availability and applies status changes.
+              PostgreSQL executes atomic conditional updates matching the current version column.
             </p>
           </div>
 
           <div className="step-card">
             <div className="step-num">03</div>
-            <h3 className="step-title">Concurrency-Safe Booking</h3>
+            <h3 className="step-title">Commit, Broadcast & Async Dispatch</h3>
             <p className="step-desc">
-              Confirm your reservation. Even if 100 concurrent requests target the same seat at the exact same
-              millisecond, optimistic version locking ensures exactly one customer receives the ticket.
+              On commit, version numbers increment atomically. The STOMP broker immediately broadcasts updated seat
+              statuses to all active clients, and an asynchronous confirmation is dispatched.
             </p>
           </div>
         </div>
@@ -258,13 +265,13 @@ export default function HomePage() {
         <div className="section-head">
           <div className="section-tag">
             <Calendar size={13} />
-            <span>Live Event Catalog</span>
+            <span>Event Catalog</span>
           </div>
           <h2 id="events-heading" className="section-title">
-            Upcoming Events & Live Shows
+            Available Events
           </h2>
           <p className="section-desc">
-            Explore 1,000+ live events. Click any event to inspect seat availability and reserve your spot.
+            Select an event to inspect venue layouts and reserve seats with live availability synchronization.
           </p>
         </div>
 
@@ -274,7 +281,7 @@ export default function HomePage() {
             <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
                 <Search
-                  size={16}
+                  size={15}
                   style={{
                     position: 'absolute',
                     left: '14px',
@@ -290,11 +297,11 @@ export default function HomePage() {
                   placeholder="Search events by artist, title, venue, or keyword..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ paddingLeft: '40px', height: '42px' }}
+                  style={{ paddingLeft: '38px', height: '40px' }}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" id="event-search-btn" style={{ height: '42px', padding: '0 20px' }}>
-                <Search size={15} />
+              <button type="submit" className="btn btn-primary" id="event-search-btn" style={{ height: '40px', padding: '0 18px' }}>
+                <Search size={14} />
                 <span>Search</span>
               </button>
             </form>
@@ -312,7 +319,7 @@ export default function HomePage() {
                       color: selectedCategory === cat ? '#ffffff' : 'var(--text-muted)',
                       borderColor: selectedCategory === cat ? 'var(--primary)' : 'var(--panel-border)',
                       fontWeight: selectedCategory === cat ? 600 : 500,
-                      padding: '6px 14px',
+                      padding: '5px 12px',
                     }}
                   >
                     {cat}
@@ -320,8 +327,8 @@ export default function HomePage() {
                 ))}
               </div>
 
-              <span style={{ fontSize: '12.5px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                {events.length} event{events.length === 1 ? '' : 's'} available
+              <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+                {events.length} event{events.length === 1 ? '' : 's'} loaded
               </span>
             </div>
           </div>
@@ -329,17 +336,17 @@ export default function HomePage() {
 
         {/* Events Grid */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '72px 0', color: 'var(--text-muted)' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', fontSize: '14px' }}>
-              <Zap size={18} color="var(--primary)" />
-              <span>Fetching events from Redis cache...</span>
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13.5px' }}>
+              <span className="hero-pulse-dot" />
+              <span>Loading event catalog...</span>
             </div>
           </div>
         ) : events.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '56px 20px' }}>
-            <h3 style={{ fontSize: '17px', fontWeight: 700, marginBottom: '6px' }}>No events found</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '420px', margin: '0 auto' }}>
-              Try adjusting your search keyword or switching category filters to view other upcoming events.
+          <div className="card" style={{ textAlign: 'center', padding: '48px 20px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>No events found</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', maxWidth: '420px', margin: '0 auto' }}>
+              Try adjusting your search keyword or switching category filters to view other events.
             </p>
           </div>
         ) : (
@@ -349,12 +356,12 @@ export default function HomePage() {
                 <div>
                   <div className="flex items-center justify-between gap-2" style={{ marginBottom: '12px' }}>
                     <span className="badge badge-primary">{event.category}</span>
-                    <span style={{ fontSize: '17px', fontWeight: 800, fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
                       ${Number(event.basePrice).toFixed(2)}
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '16.5px', fontWeight: 700, marginBottom: '8px', lineHeight: '1.3' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', lineHeight: '1.3' }}>
                     {event.title}
                   </h3>
 
@@ -402,30 +409,47 @@ export default function HomePage() {
       </section>
 
       {/* ====================================================================
-          Bottom CTA Banner
+          Interview & Demo Reference Card
           ==================================================================== */}
       <section className="landing-cta" aria-labelledby="cta-heading">
-        <div className="landing-cta-glow" aria-hidden="true" />
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: '640px', margin: '0 auto' }}>
-          <div className="section-tag" style={{ marginBottom: '16px' }}>
-            <Sparkles size={13} />
-            <span>Instant Demo Access</span>
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: '680px', margin: '0 auto' }}>
+          <div className="section-tag" style={{ marginBottom: '14px' }}>
+            <ShieldCheck size={13} />
+            <span>Demonstration & Evaluation Reference</span>
           </div>
-          <h2 id="cta-heading" style={{ fontSize: 'clamp(24px, 3.5vw, 36px)', fontWeight: 800, letterSpacing: '-0.8px', marginBottom: '14px', lineHeight: '1.2' }}>
-            Test Concurrency-Safe Booking Today
+          <h2 id="cta-heading" style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 700, letterSpacing: '-0.5px', marginBottom: '12px', lineHeight: '1.25' }}>
+            Pre-Configured Test Accounts
           </h2>
-          <p style={{ fontSize: '15px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '28px' }}>
-            Sign in with demo credentials (User, Organizer, or Admin) to test real-time seat reservation,
-            or create your own events with automated venue seat layout generation.
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
+            The database is initialized with three distinct roles to test and demonstrate end-to-end functionality,
+            optimistic lock conflict resolution, and venue management:
           </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px', textAlign: 'left' }}>
+            <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '14px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}>Attendee</div>
+              <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginBottom: '6px' }}>user@quicktix.com</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Browse events, book seats, test concurrency collisions, and view personal bookings.</div>
+            </div>
+
+            <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '14px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}>Organizer</div>
+              <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginBottom: '6px' }}>organizer@quicktix.com</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Create venues, publish events, and auto-generate configurable seat layouts.</div>
+            </div>
+
+            <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '14px' }}>
+              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}>Administrator</div>
+              <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginBottom: '6px' }}>admin@quicktix.com</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Access platform audit metrics, gross revenue stats, user registry, and all bookings.</div>
+            </div>
+          </div>
+
           <div className="flex items-center justify-center gap-3" style={{ flexWrap: 'wrap' }}>
-            <Link to="/login" className="btn-hero-primary">
-              <Ticket size={16} />
-              <span>Launch Demo Experience</span>
+            <Link to="/login" className="btn-hero-primary" style={{ padding: '10px 20px', fontSize: '13.5px' }}>
+              <span>Sign In with Demo Account</span>
+              <ArrowRight size={14} />
             </Link>
-            <a href="#events" className="btn-hero-secondary">
-              <span>Browse Catalog</span>
-            </a>
           </div>
         </div>
       </section>

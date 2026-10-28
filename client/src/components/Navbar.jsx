@@ -18,21 +18,20 @@ export default function Navbar() {
     <header className="navbar-header" style={{ borderBottom: '1px solid var(--panel-border)', background: 'var(--panel-glass)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50 }}>
       <div className="container flex items-center justify-between" style={{ height: '62px' }}>
         {/* Logo */}
-        <Link to="/" style={{ fontWeight: 800, fontSize: '19px', letterSpacing: '-0.4px', color: 'var(--text-main)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <Link to="/" style={{ fontWeight: 700, fontSize: '18px', letterSpacing: '-0.3px', color: 'var(--text-main)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
           <span>Quick<span style={{ color: 'var(--primary)' }}>Tix</span></span>
-          <span className="badge badge-primary" style={{ fontSize: '10px', padding: '1px 6px', letterSpacing: '0.5px' }}>PRO</span>
         </Link>
 
         {/* Navigation Links */}
         <nav className="flex items-center gap-6">
           <a href="/#events" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
-            Live Events
+            Events
           </a>
           <a href="/#architecture" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
             Architecture
           </a>
-          <a href="/#how-it-works" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
-            How It Works
+          <a href="/#concurrency-flow" style={{ fontSize: '13.5px', color: 'var(--text-muted)', transition: 'color 0.15s ease' }} className="nav-link">
+            Concurrency Flow
           </a>
 
           {isOrganizer && (
@@ -63,7 +62,7 @@ export default function Navbar() {
             title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
             aria-label="Toggle theme"
           >
-            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
           </button>
 
           {isAuthenticated ? (
@@ -81,7 +80,7 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-2">
               <Link to="/login" className="btn btn-secondary btn-sm">Sign In</Link>
-              <Link to="/login" className="btn btn-primary btn-sm">Demo Login</Link>
+              <Link to="/register" className="btn btn-primary btn-sm">Register</Link>
             </div>
           )}
         </div>
