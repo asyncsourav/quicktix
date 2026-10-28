@@ -12,7 +12,6 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.RedisSerializer;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.time.Duration;
@@ -23,10 +22,13 @@ import java.time.Duration;
 @EnableCaching
 @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis", matchIfMissing = true)
 public class RedisConfig {
-        
+
 
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+
+        ClassLoader classLoader = getClass().getClassLoader();
+
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMinutes(5))
                 .disableCachingNullValues()
@@ -34,7 +36,7 @@ public class RedisConfig {
                         RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.string())
                 )
                 .serializeValuesWith(
-                        RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.java())
+                        RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.java(classLoader))
                 );
 
         return RedisCacheManager.builder(connectionFactory)
