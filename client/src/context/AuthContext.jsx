@@ -5,6 +5,9 @@ import api, { setAccessToken, setOnSessionExpired, clearSession } from '../api/c
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api';
 const AuthContext = createContext(null);
 
+// Module-level in-flight promise to prevent duplicate refresh calls in React StrictMode
+let activeRestorePromise = null;
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('quicktix_user');
@@ -30,8 +33,19 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('quicktix_token');
       localStorage.removeItem('quicktix_refresh_token');
 
+      if (!activeRestorePromise) {
+        activeRestorePromise = axios
+          .post(`${baseURL}/auth/refresh`, {}, { withCredentials: true })
+          .finally(() => {
+            // Keep reference for 1 second to debounce double-invocations in React StrictMode
+            setTimeout(() => {
+              activeRestorePromise = null;
+            }, 1000);
+          });
+      }
+
       try {
-        const res = await axios.post(`${baseURL}/auth/refresh`, {}, { withCredentials: true });
+        const res = await activeRestorePromise;
         const authData = res.data?.data || res.data;
         const accessToken = authData.token || authData.accessToken;
 

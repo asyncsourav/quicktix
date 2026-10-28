@@ -3,6 +3,7 @@
 package com.asyncsourav.quicktix.service;
 
 
+
 import com.asyncsourav.quicktix.dto.email.BookingConfirmationEmailDetails;
 import com.asyncsourav.quicktix.dto.request.BookingRequest;
 import com.asyncsourav.quicktix.dto.response.BookingResponse;
@@ -71,6 +72,7 @@ class BookingServiceTest {
 
     @BeforeEach
     void setUp() {
+        
         testUser = User.builder()
                 .id(1L)
                 .name("Sourav Kumar")
@@ -116,7 +118,6 @@ class BookingServiceTest {
     @Test
     @DisplayName("createBooking: Confirms booking, transitions seats to BOOKED, broadcasts STOMP and dispatches async email")
     void createBooking_Success() {
-
         BookingRequest request = new BookingRequest(100L, List.of(1001L, 1002L));
         List<Seat> seats = new ArrayList<>(List.of(testSeat1, testSeat2));
 
@@ -145,12 +146,9 @@ class BookingServiceTest {
 
 
 
-
     @Test
-    @DisplayName("OPTIMISTIC LOCKING RACE: Simulates concurrent collision (OptimisticLockException) during seat save and rolls back")
+    @DisplayName("OPTIMISTIC LOCKING RACE: Simulates concurrent collision during seat save and rolls back")
     void createBooking_WhenOptimisticLockCollisionOccurs_ShouldThrowOptimisticLockingFailureException() {
-
-        // Given: Concurrent transaction already incremented @Version on testSeat1
         BookingRequest request = new BookingRequest(100L, List.of(1001L));
         List<Seat> seats = new ArrayList<>(List.of(testSeat1));
 
@@ -163,16 +161,13 @@ class BookingServiceTest {
             return b;
         });
 
-        // Simulate Hibernate @Version collision exception on saveAll
         when(seatRepository.saveAll(any())).thenThrow(
                 new ObjectOptimisticLockingFailureException(Seat.class.getName(), 1001L)
         );
 
-        // When & Then: Concurrency conflict must bubble up to trigger rollback and 409 Conflict
         assertThatThrownBy(() -> bookingService.createBooking(request, "user@quicktix.com"))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
-        // STOMP broadcast and email dispatch MUST NEVER be triggered if persistence collides
         verify(seatBroadcastService, never()).broadcastSeatStatusBatch(any(), any());
         verify(emailService, never()).sendBookingConfirmation(any());
     }
@@ -181,9 +176,8 @@ class BookingServiceTest {
 
 
     @Test
-    @DisplayName("createBooking: Fails when requested seat is already BOOKED (SeatUnavailableException)")
+    @DisplayName("createBooking: Fails when requested seat is already BOOKED")
     void createBooking_WhenSeatAlreadyBooked_ShouldThrowSeatUnavailableException() {
-
         testSeat1.setStatus(SeatStatus.BOOKED);
         BookingRequest request = new BookingRequest(100L, List.of(1001L));
 
@@ -202,11 +196,9 @@ class BookingServiceTest {
 
 
 
-
     @Test
     @DisplayName("cancelBooking: Releases seats to AVAILABLE, broadcasts update and sends cancellation email")
     void cancelBooking_Success() {
-        
         Booking booking = Booking.builder()
                 .id(500L)
                 .user(testUser)
