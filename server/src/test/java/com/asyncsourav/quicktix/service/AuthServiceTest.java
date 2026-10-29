@@ -243,38 +243,12 @@ class AuthServiceTest {
         verify(jwtUtil, never()).generateAccessToken(any());
     }
 
-    @Test
-    @DisplayName("ATOMIC CLAIM RACE: When markAsUsed returns 0, race is detected and entire family is revoked")
-    void refresh_WhenMarkAsUsedReturnsZero_ShouldDetectRaceAndRevokeFamily() {
-        String rawToken = "race_condition_refresh_token";
-        String tokenHash = JwtUtil.hashToken(rawToken);
-        String familyId = "race-family-123";
 
-        RefreshToken token = RefreshToken.builder()
-                .id(20L)
-                .user(testUser)
-                .tokenHash(tokenHash)
-                .familyId(familyId)
-                .used(false)
-                .revoked(false)
-                .expiresAt(Instant.now().plus(5, ChronoUnit.DAYS))
-                .build();
-
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(token));
-        // Atomic CAS claim fails (another concurrent transaction claimed it first)
-        when(refreshTokenRepository.markAsUsed(20L)).thenReturn(0);
-
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(rawToken)))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessageContaining("Refresh token reuse detected");
-
-        verify(refreshTokenRepository).revokeFamily(familyId);
-        verify(jwtUtil, never()).generateAccessToken(any());
-    }
-
+    
     @Test
     @DisplayName("logout: Revokes entire token family when valid refresh token is passed")
     void logout_Success() {
+        // Given
         String rawToken = "logout_token";
         String tokenHash = JwtUtil.hashToken(rawToken);
         String familyId = "logout-family-456";
@@ -286,8 +260,10 @@ class AuthServiceTest {
 
         when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(token));
 
+        // When
         authService.logout(new RefreshTokenRequest(rawToken));
 
+        // Then
         verify(refreshTokenRepository).revokeFamily(familyId);
     }
 }

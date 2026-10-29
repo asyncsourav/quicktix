@@ -43,10 +43,13 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Status mapping: SeatUnavailableException maps to 409 CONFLICT")
     void handleSeatUnavailable_Returns409() {
-
+        // Given
         SeatUnavailableException ex = new SeatUnavailableException(1L, "A1", "Seat already booked");
+
+        // When
         ResponseEntity<ErrorResponse> response = exceptionHandler.handleSeatUnavailable(ex, request);
 
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody().status()).isEqualTo(409);
         assertThat(response.getBody().message()).contains("Seat 'A1'");
@@ -54,13 +57,17 @@ class GlobalExceptionHandlerTest {
 
 
 
+
     @Test
     @DisplayName("Status mapping: ObjectOptimisticLockingFailureException maps to 409 CONFLICT")
     void handleOptimisticLockFailure_Returns409() {
-
+        // Given
         ObjectOptimisticLockingFailureException ex = new ObjectOptimisticLockingFailureException("Seat", 1L);
+
+        // When
         ResponseEntity<ErrorResponse> response = exceptionHandler.handleOptimisticLockFailure(ex, request);
 
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(response.getBody().status()).isEqualTo(409);
         assertThat(response.getBody().message()).contains("just selected or booked by another user");
@@ -68,13 +75,17 @@ class GlobalExceptionHandlerTest {
 
 
 
+
     @Test
     @DisplayName("Status mapping: RateLimitExceededException maps to 429 with Retry-After header")
     void handleRateLimitExceeded_Returns429WithHeader() {
-
+        // Given
         RateLimitExceededException ex = new RateLimitExceededException(5);
+
+        // When
         ResponseEntity<ErrorResponse> response = exceptionHandler.handleRateLimitExceeded(ex, request);
 
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(response.getBody().status()).isEqualTo(429);
         assertThat(response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER)).isEqualTo("5");
@@ -85,23 +96,29 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Status mapping: BadCredentialsException maps to 401 UNAUTHORIZED")
     void handleBadCredentials_Returns401() {
-
+        // Given
         BadCredentialsException ex = new BadCredentialsException("Invalid password");
+
+        // When
         ResponseEntity<ErrorResponse> response = exceptionHandler.handleBadCredentials(ex, request);
 
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(response.getBody().status()).isEqualTo(401);
     }
 
-
+    
 
     @Test
     @DisplayName("Status mapping: AccessDeniedException maps to 403 FORBIDDEN")
     void handleAccessDenied_Returns403() {
-        
+        // Given
         AccessDeniedException ex = new AccessDeniedException("Forbidden");
+
+        // When
         ResponseEntity<ErrorResponse> response = exceptionHandler.handleAccessDenied(ex, request);
 
+        // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getBody().status()).isEqualTo(403);
     }
