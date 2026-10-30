@@ -1,5 +1,7 @@
 # QuickTix
 
+[![Build](https://img.shields.io/github/actions/workflow/status/asyncsourav/quicktix/ci.yml?branch=main&logo=github)](https://github.com/asyncsourav/quicktix/actions/workflows/ci.yml)
+
 An event ticketing platform. Users browse events, pick seats on a live seat map and book them. The backend guarantees a seat can never be booked twice, and every seat change shows up on other viewers' screens without a refresh.
 
 **Live demo (frontend):** https://quicktix-weld.vercel.app/

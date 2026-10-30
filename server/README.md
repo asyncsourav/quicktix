@@ -1,5 +1,7 @@
 # QuickTix Server
 
+[![Build](https://img.shields.io/github/actions/workflow/status/asyncsourav/quicktix/ci.yml?branch=main&logo=github)](https://github.com/asyncsourav/quicktix/actions/workflows/ci.yml)
+
 The Spring Boot REST API behind [QuickTix](../README.md). It handles authentication, venues, events, automatic seat generation, bookings and the real-time seat updates.
 
 **Swagger UI:** http://localhost:8080/swagger-ui.html · **OpenAPI JSON:** http://localhost:8080/v3/api-docs
