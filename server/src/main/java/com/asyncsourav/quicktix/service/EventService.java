@@ -162,7 +162,7 @@ public class EventService {
     /**
      * Retrieves a single event by ID.
      */
-    @Cacheable(value = "event", key = "#id.toString()")
+    @Cacheable(value = "event", key = "#id")
     @Transactional(readOnly = true)
     public EventResponse getEventById(Long id) {
 

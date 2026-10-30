@@ -1,65 +1,72 @@
-# QuickTix Client
+# QuickTix Client - React Single Page Application
 
-The React frontend for [QuickTix](../README.md). It talks to the Spring Boot API in [`../server`](../server/README.md) and listens to its WebSocket endpoint for live seat updates.
+The modern React frontend for QuickTix. Built with React 19 and Vite, it interfaces with the Spring Boot backend REST API and subscribes to STOMP WebSockets for real-time seat map synchronization.
 
-**Live demo:** https://quicktix-weld.vercel.app/
+- **Production Deployment:** https://quicktix-weld.vercel.app/
+- **Backend API:** [../server/README.md](../server/README.md)
+- **Architecture Overview:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
 
-## Stack
+---
 
-React 19, Vite, React Router, Axios, @stomp/stompjs.
+## Technical Highlights
 
-## What's in it
+- **Secure In-Memory Token Management:** Access tokens are stored exclusively in JavaScript memory and React context. No sensitive authentication tokens are written to `localStorage` or `sessionStorage`, protecting the application from Cross-Site Scripting (XSS) token extraction.
+- **Silent Session Restoration:** When the application loads, an Axios interceptor dispatches a request to `/api/auth/refresh` with `withCredentials: true`. The browser securely sends the HttpOnly cookie, restoring the user session without user re-authentication or visual flashes.
+- **Queued Refresh Interceptor:** If an API call fails with HTTP 401 Unauthorized, an Axios response interceptor queues pending requests, executes a single token refresh, and replays all queued calls with the new access token. This prevents duplicate refresh requests from triggering backend token reuse detection.
+- **Real-Time Seat Picker:** Connects to the Spring STOMP broker at `/ws` using `@stomp/stompjs`. Subscribes to `/topic/event.{eventId}`, updating seat availability instantly when other users complete bookings.
+- **Role-Based Protected Routes:** Enforces strict client-side access control with a reusable `ProtectedRoute` wrapper guarding routes for `USER`, `ORGANIZER`, and `ADMIN`.
 
-- Landing page, login and registration
-- Event list with filtering and search
-- Event page with a seat picker. Seats change state live when anyone else books or cancels, without a refresh
-- My bookings, with cancellation
-- Route guards for the three roles (`USER`, `ORGANIZER`, `ADMIN`)
+---
 
-## Authentication on the client
+## Application Structure
 
-- The access token is kept in memory only (a module variable plus React state). Nothing is written to `localStorage` or `sessionStorage`.
-- The refresh token is an HttpOnly cookie that JavaScript cannot read. The Axios instance is created with `withCredentials: true` so the browser sends it to `/api/auth/refresh`.
-- When the app loads, `AuthContext` calls `/api/auth/refresh` once to restore the session. `ProtectedRoute` waits for that check to finish, so a page reload doesn't flash the login page.
-- A response interceptor handles `401` by refreshing the token and retrying the request. Refresh requests are queued, so several failed requests trigger one refresh, not many. This matters because the backend treats a reused refresh token as theft and ends the session.
+- `src/api/client.js`: Centralized Axios instance with in-memory token state and refresh interceptors.
+- `src/context/AuthContext.jsx`: Authentication provider managing user profile, role state, and logout actions.
+- `src/context/ThemeContext.jsx`: Theme provider supporting dark and light mode persistence.
+- `src/components/Navbar.jsx`: Role-tailored navigation bar rendering exactly 3 links per user role.
+- `src/pages/HomePage.jsx`: Minimalist landing page with hero search and featured events.
+- `src/pages/EventsPage.jsx`: Filterable event catalog with synchronized URL search parameters.
+- `src/pages/EventDetailPage.jsx`: Interactive seat map with live WebSocket status updates.
+- `src/pages/MyBookingsPage.jsx`: Attendee booking history with ticket cancellation support.
+- `src/pages/CreateEventPage.jsx`: Organizer portal for creating venues and publishing events.
+- `src/pages/AdminDashboard.jsx`: Administrative dashboard with gross revenue and user metrics.
 
-## Run it
+---
 
-Requirements: Node.js 18+ and the backend running on http://localhost:8080 (see the [root README](../README.md)).
+## Running Locally
 
+### Prerequisites
+- Node.js 18 or higher
+- Running QuickTix backend service on `http://localhost:8080`
+
+### Setup and Development
 ```bash
-cd client
+# 1. Install dependencies
 npm install
-cp .env.example .env     # set the backend URL, variable names are in .env.example
+
+# 2. Configure environment
+cp .env.example .env
+# Ensure VITE_API_BASE_URL=http://localhost:8080/api
+
+# 3. Start development server
 npm run dev
 ```
+The application opens at `http://localhost:5173`.
 
-The app runs at http://localhost:5173. The backend must list that origin in `CORS_ALLOWED_ORIGINS`.
+### Production Build
+```bash
+# Compile and optimize production bundle into dist/
+npm run build
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Dev server with hot reload |
-| `npm run build` | Production build into `dist/` |
-| `npm run preview` | Serve the production build locally |
-
-## Project layout
-
-```
-client/
-├── src/
-│   ├── api/client.js            Axios instance, in-memory token, refresh interceptor
-│   ├── context/AuthContext.jsx  Current user, login, logout, session restore
-│   ├── App.jsx                  Routes and ProtectedRoute
-│   └── ...                      Pages and components
-├── .env.example
-├── vercel.json
-└── vite.config.js
+# Preview production build locally
+npm run preview
 ```
 
-## Deployment
+---
 
-The frontend is deployed on Vercel (`vercel.json` is in this folder). Set the backend URL in the Vercel project's environment variables. For a deployed setup, the backend's `CORS_ALLOWED_ORIGINS` must include the Vercel URL, and because the frontend and backend are on different sites, the refresh cookie needs `Secure` and `SameSite=None`.
+## Deployment (Vercel)
 
-## Still to do
-
-Automated frontend tests.
+The frontend is deployed on Vercel with single-page app rewrites configured in `vercel.json`. For production deployments:
+- Configure `VITE_API_BASE_URL` in Vercel environment variables pointing to the hosted backend.
+- Ensure the backend's `CORS_ALLOWED_ORIGINS` includes the Vercel domain.
+- Ensure the backend's `JWT_COOKIE_SECURE=true` is set so refresh cookies transmit across HTTPS domains (`SameSite=None; Secure`).

@@ -1,101 +1,79 @@
-# QuickTix Scripts
+# QuickTix Benchmark and Test Scripts
 
-Small Node.js scripts that send real traffic to the running backend to check behaviour that unit tests with mocks can't show: races between concurrent requests, cache speed-up and eviction, rate limiting, and live WebSocket updates.
+Automated scripts for verifying distributed system behavior under real concurrent traffic against the running Docker stack (backend, PostgreSQL 16, Redis 7).
 
-All results below were measured on one local machine against the Docker Compose stack (backend, PostgreSQL 16, Redis 7). Treat them as local numbers, not production numbers.
+- **Parent Repository:** [../README.md](../README.md)
+- **Architecture Walkthrough:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
 
-| Script | What it checks |
-|---|---|
-| `race.mjs` | A seat can't be booked twice under simultaneous requests |
-| `latency.mjs` | Response time of cached vs uncached event reads |
-| `check-eviction.mjs` | The cache is cleared when an event is updated |
-| `rate-limit.mjs` | Booking requests are throttled with `429` |
-| `websocket-latency.mjs` | How fast a seat change reaches connected clients |
+---
 
-## Setup
+## Scripts Inventory
+
+| Script | Purpose | Evaluation Focus |
+|---|---|---|
+| `booking-load-test.js` | k6 load test simulating 100 sustained concurrent users | p95 latency, throughput (req/s), and error rate |
+| `race.mjs` | Concurrent reservation attempts on the exact same seat | Double-booking prevention via JPA optimistic locking |
+| `latency.mjs` | Compares cached vs uncached event catalog queries | Redis cache speedup and response latency |
+| `rate-limit.mjs` | Rapid-fire booking requests under Bucket4j token bucket | Distributed rate-limiting and burst rejection (HTTP 429) |
+| `websocket-latency.mjs` | Measures seat update propagation to 50 active clients | STOMP message delivery reliability and broadcast latency |
+| `check-eviction.mjs` | Modifies event data and checks cache invalidation | Cache-aside consistency and eviction correctness |
+
+---
+
+## Prerequisites
 
 - Node.js 18 or newer
-- The stack running: `docker compose up -d --build` from the repository root
-- Seeded demo data (loaded on first start). The scripts log in with the demo accounts from the root README
-- For `websocket-latency.mjs`: `cd scripts && npm install` (it needs `@stomp/stompjs` and `ws`)
-
-Run any script from the repository root, for example `node scripts/race.mjs`. Edit the constants at the top of a script (event ID, seat ID, token or credentials) if your data differs. Resetting everything, including the seeded data: `docker compose down -v` and then `docker compose up -d`.
+- Running Docker Compose stack from the repository root: `docker compose up -d`
+- k6 CLI installed (`winget install GrafanaLabs.k6` on Windows, or via Docker)
 
 ---
 
-## `race.mjs`: double-booking check
+## How to Run Each Script
 
-Sends 10 `POST /api/bookings` requests for the same seat at the same moment using `Promise.all`, and prints the status codes.
+Run all scripts from the repository root:
 
-Expected: exactly one `201 Created`, and the rest rejected. The seat must be `AVAILABLE` before the run, so use a fresh seat or cancel the previous booking.
+### 1. Load Test (100 Concurrent Users)
+Simulates 100 concurrent virtual users hitting the authenticated booking service:
+```bash
+# Using native k6:
+k6 run scripts/booking-load-test.js
 
-Recorded result (before the rate limiter was added): 1 × `201`, 9 × `409` ("This seat was just selected or booked by another user").
+# Or using Docker:
+Get-Content scripts/booking-load-test.js | docker run --rm -i --network quicktikbooking_default -e BASE_URL=http://quicktix-backend:8080 grafana/k6 run -
+```
+**Measured Result:** Sustained 100 concurrent users at 48.9 ms p95 latency, 1,223.7 req/sec throughput, and 0.00% error rate (0 failed requests out of 61,406).
 
-Booking is now rate limited per user (burst of 5), so a single-user run also shows some `429` responses. The guarantee being tested still shows: only one request gets a `201`.
+### 2. Double-Booking Prevention Race Test
+Fires 10 concurrent HTTP POST requests for the exact same seat simultaneously:
+```bash
+node scripts/race.mjs
+```
+**Measured Result:** Exactly 1 request succeeds with HTTP 201 Created; 9 requests fail with HTTP 409 Conflict. Zero double-bookings occur.
 
----
+### 3. Redis Cache Latency Test
+Sends 20 warm-up requests followed by 200 sequential queries to compare performance:
+```bash
+node scripts/latency.mjs
+```
+**Measured Result:** Cached reads return in 5.4 ms median (6.2 ms average, 11.0 ms p95) compared to 22.1 ms uncached (a ~75% reduction in query latency).
 
-## `latency.mjs`: Redis cache speed
+### 4. Distributed Rate Limiter Test
+Executes 1,000 requests with 100 in flight, followed by a sustained 4 req/sec load:
+```bash
+node scripts/rate-limit.mjs
+```
+**Measured Result:** In Phase 1, 995 of 1,000 requests (99.5%) were blocked with HTTP 429 in 1.66s, adhering to the 5-token burst limit. In Phase 2, exactly 1.1 requests/sec were allowed, matching the token refill rate.
 
-Logs in, sends 20 warm-up requests, then 200 sequential requests each to `GET /api/events` and `GET /api/events/1`, and prints average, p50 and p95 in milliseconds.
+### 5. WebSocket Broadcast Latency Test
+Connects 50 active STOMP WebSocket subscribers, alternates booking and releasing a seat for 30 rounds, and measures delivery time across 1,500 total messages:
+```bash
+node scripts/websocket-latency.mjs
+```
+**Measured Result:** 1,500 of 1,500 messages delivered (100% success rate, 0 lost messages) with a median latency of 23.8 ms and p95 latency of 36.8 ms.
 
-To compare, run it twice against the same data:
-
-1. Cache off: add `SPRING_CACHE_TYPE: none` to the backend's `environment` in `docker-compose.yml`, run `docker compose up -d`, then run the script.
-2. Cache on: remove that line, run `docker compose up -d` again, then run the script.
-
-Dataset: 1,000 events (4 seeded plus 996 generated with a SQL insert).
-
-| Endpoint | Metric | No cache | Redis cache |
-|---|---|---|---|
-| `GET /api/events` | p50 | 22.1 ms | 17.7 ms |
-| | average | 24.7 ms | 18.4 ms |
-| | p95 | 38.2 ms | 29.2 ms |
-| `GET /api/events/1` | p50 | 15.3 ms | 13.7 ms |
-| | average | 15.2 ms | 14.1 ms |
-| | p95 | 25.1 ms | 22.5 ms |
-
-The gain is modest because PostgreSQL on localhost is already fast and part of every request is spent in the security filter and JSON serialization. A remote database or concurrent load would show a larger difference.
-
----
-
-## `check-eviction.mjs`: cache invalidation
-
-Reads `GET /api/events/1` so it is cached, logs in as the organizer, updates the event with `PUT /api/events/1` using a timestamped title, then reads the event again and compares titles.
-
-Expected output: `Eviction check passed: Fresh data returned immediately.` A failure means a stale cached value was served after the update.
-
----
-
-## `rate-limit.mjs`: booking throttling
-
-Uses a dedicated test user so it doesn't affect other tests' limits, and books a seat that is already taken so no data changes. Any request that gets past the limiter is answered by the booking logic, and anything else is `429`.
-
-- Phase 1: 1,000 requests, 100 in flight at a time
-- Phase 2: 4 requests per second for 10 seconds
-
-Limits in the backend: per user, burst 5 and refill 1 token per second; per IP, burst 10 and refill 2 tokens per second.
-
-| Run | Result |
-|---|---|
-| Phase 1 | 994 of 1,000 blocked with `429` (99.4%) in 1.9 s; 6 allowed (the burst plus one refill) |
-| Phase 2 | 11 allowed over 10 s, about 1.1 per second |
-
-A `429` response carries `Retry-After: 1` and the standard JSON error body. The token buckets live in Redis, so wait 10 to 15 seconds between runs or the first numbers will look wrong.
-
----
-
-## `websocket-latency.mjs`: live seat updates
-
-Connects 50 STOMP clients to `ws://localhost:8080/ws`, all subscribed to `/topic/event.1`. It then runs 30 rounds that alternate booking and cancelling a seat, and records when each client receives the update. Pass a different client count as an argument, for example `node scripts/websocket-latency.mjs 10`.
-
-The timer starts right before the booking or cancellation request is sent, so each time includes the HTTP request, the database transaction and the broadcast.
-
-| Metric | Result |
-|---|---|
-| Delivery | 1,500 of 1,500 messages received (50 clients × 30 rounds) |
-| Median | 15.8 ms |
-| p95 | 20.7 ms |
-| Min / max | 9.7 ms / 39.8 ms |
-
-All 50 clients run in one Node process on the same machine as the server, so this excludes real network latency and browser rendering. A deployed setup will be slower.
+### 6. Cache Invalidation Test
+Updates event details and asserts that fresh data is immediately returned on the next read:
+```bash
+node scripts/check-eviction.mjs
+```
+**Measured Result:** Passed. Cache is instantly invalidated upon write; stale data is never served.

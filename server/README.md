@@ -1,115 +1,78 @@
-# QuickTix Server
+# QuickTix Server - Spring Boot REST API
 
-[![Build](https://img.shields.io/github/actions/workflow/status/asyncsourav/quicktix/ci.yml?branch=main&logo=github)](https://github.com/asyncsourav/quicktix/actions/workflows/ci.yml)
+The core backend service powering QuickTix. Built with Java 25 and Spring Boot 4, it provides concurrent seat booking, distributed rate limiting, real-time WebSocket state propagation, and JWT authentication.
 
-The Spring Boot REST API behind [QuickTix](../README.md). It handles authentication, venues, events, automatic seat generation, bookings and the real-time seat updates.
+- **Swagger UI:** http://localhost:8080/swagger-ui.html
+- **OpenAPI Schema:** http://localhost:8080/v3/api-docs
+- **Parent Repository:** [../README.md](../README.md)
+- **Architecture Overview:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
 
-**Swagger UI:** http://localhost:8080/swagger-ui.html · **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+---
 
-## Stack
+## Technical Architecture
 
-Java 25, Spring Boot 4, Spring Security, Spring Data JPA (Hibernate 7), PostgreSQL 16, Redis 7 (Spring Cache and Bucket4j with Lettuce), Spring WebSocket (STOMP), Spring Mail, springdoc-openapi, Maven.
+- **Stateless Authentication:** Issues 15-minute access tokens in memory and 7-day refresh tokens via secure, HttpOnly cookies. Stores only SHA-256 hashes of refresh tokens in the database with atomic reuse detection and session family revocation.
+- **Race Condition Prevention:** Implements JPA optimistic locking (`@Version`) on `Seat` records. When multiple concurrent requests attempt to reserve the same seat, only the first transaction commits; subsequent transactions fail version validation, trigger a rollback, and return HTTP 409 Conflict.
+- **Distributed Throttling:** Utilizes Bucket4j and Lettuce over Redis. Implements a dual-bucket policy (10-burst per IP, 5-burst per user) with Resilience4j circuit breaking to fail-open if Redis encounters connectivity issues.
+- **Cache-Aside Layer:** Employs Redis caching for event catalog queries (`@Cacheable`) with 5-minute TTL. Automatically invalidates caches (`@CacheEvict`) upon event creation, modification, or cancellation. Falls back gracefully to PostgreSQL if Redis is offline.
+- **Real-Time Push:** Employs a Spring WebSocket STOMP broker. Seat mutations broadcast to `/topic/event.{id}`, delivering updates to connected clients in ~25 ms.
+- **Non-Blocking Email:** Employs an asynchronous thread pool (`@Async`) for booking confirmation emails, isolating third-party SMTP response latency from HTTP request threads.
 
-## Run it
+---
 
-**With Docker (backend, PostgreSQL and Redis together)**, from the repository root:
+## API Summary (24 Endpoints)
 
+| Domain | Route Patterns | Security |
+|---|---|---|
+| **Authentication** | `POST /api/auth/register`, `/login`, `/refresh`, `/logout` | Public (Register, Login, Refresh) |
+| **Events** | `GET /api/events`, `GET /api/events/{id}`, `GET /api/events/{id}/seats` | Public reads |
+| | `POST /api/events`, `PUT /api/events/{id}`, `DELETE /api/events/{id}` | Role: ORGANIZER, ADMIN |
+| **Venues** | `GET /api/venues`, `GET /api/venues/{id}`, `GET /api/venues/organizer/{id}` | Public reads |
+| | `POST /api/venues`, `PUT /api/venues/{id}`, `DELETE /api/venues/{id}` | Role: ORGANIZER, ADMIN |
+| **Bookings** | `POST /api/bookings`, `GET /api/bookings/me`, `GET /api/bookings/{id}`, `DELETE /api/bookings/{id}` | Authenticated Users |
+| **Admin** | `GET /api/admin/users`, `GET /api/admin/stats`, `GET /api/admin/bookings` | Role: ADMIN |
+| **Health** | `GET /api/ping` | Public |
+
+---
+
+## Configuration Variables
+
+Environment configurations are separated into `application-dev.yml` and `application-prod.yml`:
+
+- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`: PostgreSQL connection coordinates.
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`: Redis connection for caching and Bucket4j rate limiting.
+- `JWT_SECRET`: 256-bit secret key used to sign and verify HMAC-SHA256 access tokens.
+- `JWT_COOKIE_SECURE`: Controls whether the refresh cookie requires HTTPS (`true` for production, `false` for local development).
+- `CORS_ALLOWED_ORIGINS`: Comma-delimited list of permitted client origins (e.g. `http://localhost:5173,https://quicktix-weld.vercel.app`).
+- `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`: SMTP server credentials for async notifications.
+
+---
+
+## Running Locally
+
+### Option 1: Run with Docker Compose (Recommended)
+From the repository root:
 ```bash
-cp .env.example .env     # then set JWT_SECRET
 docker compose up -d --build
-docker compose logs -f backend
 ```
 
-**From the IDE or Maven**, with only the dependencies in Docker:
-
+### Option 2: Run via Maven Wrapper
+Ensure local PostgreSQL and Redis instances are running:
 ```bash
-docker compose up -d postgres redis
-cd server
 ./mvnw spring-boot:run
 ```
 
-Run the tests with `./mvnw test`.
+---
 
-## Configuration
+## Automated Testing
 
-Settings are read from environment variables, with a `dev` and a `prod` profile (`application-dev.yml`, `application-prod.yml`).
+The suite uses JUnit 5, Mockito, and Testcontainers to execute real database and cache assertions in ephemeral Docker containers:
 
-| Variable | Purpose |
-|---|---|
-| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | PostgreSQL connection |
-| `REDIS_HOST`, `REDIS_PORT` | Redis connection (used for cache and rate limiting) |
-| `JWT_SECRET` | Signing key for access tokens. Required, use a long random value |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins, also applied to the WebSocket endpoint |
-| `JWT_COOKIE_SECURE` | `false` for local HTTP, `true` when served over HTTPS |
+```bash
+# Run all unit and integration tests:
+./mvnw test
 
-Email uses Spring's standard `spring.mail.*` properties (SMTP host, username, password). Keep credentials in `.env`, never in the repository.
-
-## API overview
-
-24 endpoints, all documented in Swagger UI.
-
-| Group | Endpoints |
-|---|---|
-| Auth | `POST /api/auth/register`, `/login`, `/refresh`, `/logout` |
-| Venues | `GET /api/venues`, `GET /api/venues/{id}`, `GET /api/venues/organizer/{organizerId}`, `POST /api/venues`, `PUT` and `DELETE /api/venues/{id}` |
-| Events | `GET /api/events` (optional `category` and `search`), `GET /api/events/{id}`, `GET /api/events/{id}/seats`, `POST /api/events`, `PUT` and `DELETE /api/events/{id}` |
-| Bookings | `POST /api/bookings`, `GET /api/bookings/me`, `GET /api/bookings/{id}`, `DELETE /api/bookings/{id}` |
-| Admin | `GET /api/admin/users`, `/stats`, `/bookings` |
-| Health | `GET /api/ping` |
-
-Roles are `ADMIN`, `ORGANIZER` and `USER`. An event can only be changed or deleted by its organizer or an admin, and an organizer can only schedule events at venues they own.
-
-**Responses.** Successful responses use an `ApiResponse<T>` envelope. Errors go through a global `@RestControllerAdvice` and return one shape:
-
-```json
-{
-  "timestamp": "2026-10-24T04:50:30",
-  "status": 429,
-  "error": "Too Many Requests",
-  "message": "Too many booking requests. Please wait 1 second before trying again."
-}
+# Generate JaCoCo code coverage report:
+./mvnw test jacoco:report
 ```
-
-## How the important parts work
-
-**Booking and concurrency.** `Seat` has a `@Version` field. A booking changes all requested seats in one `@Transactional` method. If another request got to a seat first, Hibernate throws an optimistic locking failure, the whole booking rolls back (no partial bookings) and the API returns `409`.
-
-**Authentication.** Login returns a 15-minute access token in the response body and sets a refresh token cookie (`HttpOnly`, `Path=/api/auth`, 7 days). The database stores only the SHA-256 hash of each refresh token plus a session family ID. `POST /api/auth/refresh` claims the current token with a single atomic update (`WHERE used = false`), then issues a new pair in the same family. A token that is already used or revoked triggers reuse detection: the whole family is revoked and the cookie is cleared. `POST /api/auth/logout` revokes the family. The reuse-detection method uses `@Transactional(noRollbackFor = BadCredentialsException.class)` so the revoke is not rolled back by the exception that follows it.
-
-**Caching.** `GET /api/events` and `GET /api/events/{id}` use `@Cacheable` (cache names `events` and `event`, 5-minute TTL). Create, update and delete evict them. `CacheErrorConfig` logs cache errors and carries on, so a Redis outage means slower reads from PostgreSQL, not failures. Seat availability is never cached.
-
-**Rate limiting.** An interceptor on `POST /api/bookings` applies Bucket4j token buckets stored in Redis: per user (burst 5, refill 1 per second) and per IP (burst 10, refill 2 per second). Redis timeouts are short (200 ms) and any Redis failure lets the request through. Limit hits throw `RateLimitExceededException`, handled with `Retry-After`.
-
-**Real-time updates.** `WebSocketConfig` exposes `/ws` (SockJS and native WebSocket) with a simple in-memory broker on `/topic`. After a booking or cancellation, `SeatBroadcastService` publishes the seat change to `/topic/event.{eventId}`. The in-memory broker only reaches clients connected to the same instance, so running several instances would need a shared broker such as Redis pub/sub.
-
-**Email.** `EmailService` sends booking and cancellation emails with `@Async` on a dedicated executor, using small detached DTOs so no entity or database session is touched off the request thread.
-
-## Package structure
-
-```
-com.asyncsourav.quicktix/
-├── config/       Security, CORS, Redis, rate limiter, WebSocket, OpenAPI, async executor, data seeding
-├── controller/   Auth, Event, Venue, Booking, Admin, Ping
-├── dto/          common (ApiResponse, ErrorResponse), request, response, email
-├── entity/       User, Venue, Event, Seat, Booking, RefreshToken and their enums
-├── exception/    Domain exceptions and GlobalExceptionHandler
-├── repository/   Spring Data JPA repositories
-├── security/     JwtUtil, JwtAuthFilter, CustomUserDetailsService
-└── service/      Auth, Event, Venue, Booking, Admin, RateLimiter, SeatBroadcast, Email
-```
-
-## Docker image
-
-The `Dockerfile` has two stages: Maven with a full JDK builds the jar, and a JRE-only Alpine image runs it. The final image is about 434 MB compared with 870 MB for a single-stage build of the same app. A `.dockerignore` keeps `target/`, `.git` and local files out of the build.
-
-## Tests
-
-`./mvnw test` runs the 26-test suite (JUnit 5, Mockito, and Testcontainers against real PostgreSQL and Redis containers).
-
-- **Testcontainers Integration Tests (`BookingIntegrationTest`):**
-  - Full end-to-end booking lifecycle and cancellation workflows with seat state and transaction rollback verification.
-- **Service Layer Unit Tests:** High-risk business logic across `BookingService` (81.6% line coverage), `AuthService` (91.7% line coverage), and `EmailService` (58.8% line coverage).
-- **Coverage (JaCoCo):**
-  - **43.2% line coverage (41.6% instruction coverage)** on service-layer logic.
-  - **39.8% line coverage** across the overall application bundle.
-  - Excludes boilerplate by design (DTOs, JPA entities, configuration classes, and application bootstrap). Run `./mvnw verify` or `./mvnw test` to generate the interactive report at `target/site/jacoco/index.html`.
+JaCoCo HTML reports are generated at `target/site/jacoco/index.html`.
