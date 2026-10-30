@@ -2,6 +2,8 @@
 
 This document provides a technical walkthrough of how requests traverse the QuickTix platform, covering security, rate limiting, caching, concurrency control, data persistence, and real-time broadcasting.
 
+For a file-by-file directory map of the codebase, see [folder-structure.md](folder-structure.md).
+
 ---
 
 ## 1. High-Level Architecture Overview

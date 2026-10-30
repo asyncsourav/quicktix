@@ -7,6 +7,7 @@ A full-stack, distributed ticket booking system engineered to prevent race condi
 - **Live Demo (Frontend):** https://quicktix-weld.vercel.app/
 - **API Documentation:** http://localhost:8080/swagger-ui.html (when running locally)
 - **Architecture Deep-Dive:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Complete File Directory:** [folder-structure.md](folder-structure.md)
 
 ---
 
@@ -55,6 +56,7 @@ All metrics were gathered from real traffic runs against the Dockerized stack:
 - `client/`: React 19 frontend application with role-based routing and responsive seat map. (See [client/README.md](client/README.md))
 - `scripts/`: Production benchmark harnesses for race conditions, Redis latency, rate limiting, WebSockets, and k6 load tests. (See [scripts/README.md](scripts/README.md))
 - `ARCHITECTURE.md`: Deep-dive technical documentation of the 10-stage request execution flow.
+- `folder-structure.md`: Comprehensive file map with direct links to every source file across server and client.
 - `docker-compose.yml`: Local orchestrator for backend, PostgreSQL, and Redis.
 
 ---
