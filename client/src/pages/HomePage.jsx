@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import {
@@ -10,14 +10,16 @@ import {
   Zap,
   Ticket,
   Users,
-  CheckCircle2,
-  Sparkles,
+  Search,
 } from 'lucide-react';
 
 export default function HomePage() {
   const { user, isAuthenticated, isOrganizer, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [featuredEvents, setFeaturedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [heroSearch, setHeroSearch] = useState('');
+  const [heroCategory, setHeroCategory] = useState('All');
 
   useEffect(() => {
     fetchFeaturedEvents();
@@ -26,13 +28,21 @@ export default function HomePage() {
   const fetchFeaturedEvents = async () => {
     try {
       const res = await api.get('/events');
-      // Show up to 3 upcoming events as featured on landing page
       setFeaturedEvents((res.data || []).slice(0, 3));
     } catch (err) {
       console.error('Failed to load featured events:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleHeroSearch = (e) => {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (heroSearch.trim()) params.set('search', heroSearch.trim());
+    if (heroCategory !== 'All') params.set('category', heroCategory);
+    const queryString = params.toString();
+    navigate(`/events${queryString ? `?${queryString}` : ''}`);
   };
 
   const formatDateTime = (dateString) => {
@@ -95,21 +105,21 @@ export default function HomePage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Link to="/events" className="btn btn-secondary btn-sm">
+            <Link to="/events" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
               Browse Events
             </Link>
             {isOrganizer && (
-              <Link to="/organizer/create" className="btn btn-primary btn-sm">
+              <Link to="/organizer/create" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
                 Create Event
               </Link>
             )}
             {isAdmin && (
-              <Link to="/admin" className="btn btn-primary btn-sm">
+              <Link to="/admin" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
                 Admin Panel
               </Link>
             )}
             {!isOrganizer && !isAdmin && (
-              <Link to="/my-bookings" className="btn btn-primary btn-sm">
+              <Link to="/my-bookings" className="btn btn-primary btn-sm" style={{ textDecoration: 'none' }}>
                 My Bookings
               </Link>
             )}
@@ -118,34 +128,16 @@ export default function HomePage() {
       )}
 
       {/* ====================================================================
-          Hero Section
+          Hero Section (Clean, Professional, No Gimmick Icons)
           ==================================================================== */}
       <section
         style={{
-          padding: '48px 0 40px',
+          padding: '40px 0 32px',
           textAlign: 'center',
-          maxWidth: '780px',
+          maxWidth: '820px',
           margin: '0 auto',
         }}
       >
-        <div
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'var(--primary-dim)',
-            color: 'var(--primary)',
-            padding: '4px 12px',
-            borderRadius: '20px',
-            fontSize: '12.5px',
-            fontWeight: 600,
-            marginBottom: '18px',
-          }}
-        >
-          <Sparkles size={14} />
-          <span>Real-Time Seat Booking Platform</span>
-        </div>
-
         <h1
           style={{
             fontSize: 'clamp(32px, 5vw, 48px)',
@@ -153,10 +145,10 @@ export default function HomePage() {
             letterSpacing: '-1px',
             lineHeight: 1.15,
             color: 'var(--text-main)',
-            marginBottom: '18px',
+            marginBottom: '16px',
           }}
         >
-          Experience live events with <span style={{ color: 'var(--primary)' }}>real-time seat selection</span>
+          Book live event tickets with <span style={{ color: 'var(--primary)' }}>real-time seat selection</span>
         </h1>
 
         <p
@@ -165,43 +157,86 @@ export default function HomePage() {
             lineHeight: 1.6,
             color: 'var(--text-muted)',
             marginBottom: '32px',
-            maxWidth: '640px',
+            maxWidth: '620px',
             marginLeft: 'auto',
             marginRight: 'auto',
           }}
         >
-          Pick your exact seats on interactive venue maps. Zero double-booking, live availability updates across all viewers, and instant digital ticket confirmation.
+          Choose your exact seats on interactive venue maps. Zero double-booking, live availability updates, and instant digital confirmations.
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '40px' }}>
-          <Link
-            to="/events"
-            className="btn btn-primary"
-            style={{ padding: '12px 24px', fontSize: '15px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-          >
-            <span>Explore All Events</span>
-            <ArrowRight size={16} />
-          </Link>
-          {!isAuthenticated ? (
-            <Link
-              to="/register"
-              className="btn btn-secondary"
-              style={{ padding: '12px 24px', fontSize: '15px', textDecoration: 'none' }}
-            >
-              Create Account
-            </Link>
-          ) : (
-            <Link
-              to="/my-bookings"
-              className="btn btn-secondary"
-              style={{ padding: '12px 24px', fontSize: '15px', textDecoration: 'none' }}
-            >
-              View My Bookings
-            </Link>
-          )}
-        </div>
+        {/* Hero Interactive Search Bar */}
+        <form
+          onSubmit={handleHeroSearch}
+          style={{
+            background: 'var(--panel)',
+            border: '1px solid var(--panel-border)',
+            borderRadius: 'var(--radius)',
+            padding: '8px',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            maxWidth: '640px',
+            margin: '0 auto 36px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <Search
+              size={18}
+              color="var(--text-dim)"
+              style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+            />
+            <input
+              type="text"
+              value={heroSearch}
+              onChange={(e) => setHeroSearch(e.target.value)}
+              placeholder="Search by artist, concert, or venue..."
+              className="input"
+              style={{
+                paddingLeft: '40px',
+                border: 'none',
+                background: 'transparent',
+                fontSize: '14px',
+              }}
+            />
+          </div>
 
-        {/* 3 Core Highlights */}
+          <select
+            value={heroCategory}
+            onChange={(e) => setHeroCategory(e.target.value)}
+            className="input"
+            style={{
+              width: 'auto',
+              minWidth: '130px',
+              border: 'none',
+              background: 'var(--bg-subtle)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '13px',
+              cursor: 'pointer',
+              color: 'var(--text-main)',
+            }}
+          >
+            <option value="All">All Genres</option>
+            <option value="Concert">Concerts</option>
+            <option value="Sports">Sports</option>
+            <option value="Theater">Theater</option>
+            <option value="Conference">Conferences</option>
+            <option value="Comedy">Comedy</option>
+          </select>
+
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ padding: '10px 20px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Search size={15} />
+            <span>Find Tickets</span>
+          </button>
+        </form>
+
+        {/* 3 Core Highlights (No Gimmick Icons) */}
         <div
           style={{
             display: 'grid',
@@ -223,7 +258,7 @@ export default function HomePage() {
               <span>Live Seat Sync</span>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>
-              Seats change color and status in real-time on your screen as others browse and book.
+              Seats update dynamically on your screen in real time as tickets are selected and purchased.
             </p>
           </div>
 
@@ -240,7 +275,7 @@ export default function HomePage() {
               <span>Zero Double-Booking</span>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>
-              Concurrency-safe transactions ensure a seat can never be purchased twice by racing buyers.
+              Concurrency-safe transactions guarantee that seats cannot be purchased twice during simultaneous rushes.
             </p>
           </div>
 
@@ -257,7 +292,7 @@ export default function HomePage() {
               <span>Instant Confirmation</span>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>
-              Confirmed reservations are immediately accessible in your account and dispatched via email.
+              Completed bookings are securely confirmed immediately in your account and sent to your email.
             </p>
           </div>
         </div>
@@ -273,7 +308,7 @@ export default function HomePage() {
               Featured Events
             </h2>
             <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-              Upcoming highlights ready for instant seat selection
+              Upcoming performances with live interactive seating available now
             </p>
           </div>
           <Link
@@ -320,7 +355,9 @@ export default function HomePage() {
             }}
           >
             <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>No upcoming events scheduled at the moment.</p>
-            <Link to="/events" className="btn btn-secondary btn-sm">Explore Event Catalog</Link>
+            <Link to="/events" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
+              Explore Event Catalog
+            </Link>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
@@ -411,7 +448,7 @@ export default function HomePage() {
             How QuickTix Works
           </h2>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-            Transparent, fast, and reliable ticketing from start to finish.
+            Transparent, reliable, and instant ticketing from search to reservation.
           </p>
         </div>
 
@@ -439,7 +476,7 @@ export default function HomePage() {
                 Browse & Filter Events
               </h3>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                Explore concerts, theater, conferences, and sports matches. Filter by genre or search by your favorite performer.
+                Explore concerts, sports tournaments, comedy, and conferences. Filter by genre or search by performer.
               </p>
             </div>
           </div>
@@ -467,7 +504,7 @@ export default function HomePage() {
                 Pick Your Exact Seat
               </h3>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                Open the live interactive seat map. Check rows, seat labels, and live pricing. Available seats update continuously.
+                Open the interactive seat map. Check rows, seat labels, and live pricing. Seat availability updates continuously.
               </p>
             </div>
           </div>
@@ -495,7 +532,7 @@ export default function HomePage() {
                 Instant Booking Guarantee
               </h3>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                Confirm your booking in one click. Your seat is locked, immune to race conditions, and saved to your account.
+                Confirm your booking in seconds. Your selected seats are locked, safe from race collisions, and saved to your account.
               </p>
             </div>
           </div>
@@ -508,7 +545,7 @@ export default function HomePage() {
       <section
         id="organizers"
         style={{
-          background: 'linear-gradient(135deg, var(--panel) 0%, var(--bg-subtle) 100%)',
+          background: 'var(--panel)',
           border: '1px solid var(--panel-border)',
           borderRadius: 'var(--radius)',
           padding: '40px 32px',
@@ -540,7 +577,7 @@ export default function HomePage() {
             Host your next event with QuickTix
           </h2>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-            Venue management made simple. Register venues, generate seating charts automatically based on capacity, configure ticket pricing tiers, and monitor real-time ticket sales.
+            Register venues, generate seating charts automatically based on capacity, configure ticket pricing tiers, and monitor real-time ticket sales.
           </p>
         </div>
 

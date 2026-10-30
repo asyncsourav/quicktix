@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, PlusCircle, RefreshCw } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -52,9 +53,23 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <button onClick={fetchAdminData} className="btn btn-secondary btn-sm">
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/organizer/create"
+            className="btn btn-primary btn-sm flex items-center gap-1.5"
+            style={{ textDecoration: 'none' }}
+          >
+            <PlusCircle size={14} />
+            <span>Create Event</span>
+          </Link>
+          <button
+            onClick={fetchAdminData}
+            className="btn btn-secondary btn-sm flex items-center gap-1.5"
+          >
+            <RefreshCw size={13} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {error && (

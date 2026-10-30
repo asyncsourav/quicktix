@@ -1,27 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../api/client';
-import { Search, Calendar, MapPin, ArrowRight, Tag, X, Filter } from 'lucide-react';
+import { Search, Calendar, MapPin, ArrowRight, X, Filter, SearchX } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Concert', 'Sports', 'Theater', 'Conference', 'Comedy'];
 
 export default function EventsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialCategory = searchParams.get('category') || 'All';
+  const initialQuery = searchParams.get('search') || '';
+
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
 
   useEffect(() => {
-    fetchEvents();
-  }, [selectedCategory]);
+    const cat = searchParams.get('category') || 'All';
+    const query = searchParams.get('search') || '';
+    setSelectedCategory(cat);
+    setSearchQuery(query);
+    fetchEvents(cat, query);
+  }, [searchParams]);
 
-  const fetchEvents = async (customSearch = null) => {
+  const fetchEvents = async (category = selectedCategory, query = searchQuery) => {
     setLoading(true);
     try {
       const params = {};
-      if (selectedCategory !== 'All') params.category = selectedCategory;
-      const query = customSearch !== null ? customSearch : searchQuery;
-      if (query.trim()) params.search = query.trim();
+      if (category && category !== 'All') params.category = category;
+      if (query && query.trim()) params.search = query.trim();
 
       const res = await api.get('/events', { params });
       setEvents(res.data || []);
@@ -34,12 +41,30 @@ export default function EventsPage() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    fetchEvents();
+    updateUrlParams(selectedCategory, searchQuery);
+  };
+
+  const handleCategorySelect = (cat) => {
+    setSelectedCategory(cat);
+    updateUrlParams(cat, searchQuery);
   };
 
   const clearSearch = () => {
     setSearchQuery('');
-    fetchEvents('');
+    updateUrlParams(selectedCategory, '');
+  };
+
+  const resetAllFilters = () => {
+    setSelectedCategory('All');
+    setSearchQuery('');
+    setSearchParams({});
+  };
+
+  const updateUrlParams = (cat, query) => {
+    const nextParams = {};
+    if (cat && cat !== 'All') nextParams.category = cat;
+    if (query && query.trim()) nextParams.search = query.trim();
+    setSearchParams(nextParams);
   };
 
   const formatDateTime = (dateString) => {
@@ -54,10 +79,12 @@ export default function EventsPage() {
     });
   };
 
+  const hasActiveFilters = searchQuery.trim() !== '' || selectedCategory !== 'All';
+
   return (
     <div className="container" style={{ paddingTop: '32px', paddingBottom: '60px' }}>
       {/* Header section */}
-      <div style={{ marginBottom: '32px' }}>
+      <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--text-main)', marginBottom: '8px' }}>
           Explore Events
         </h1>
@@ -66,20 +93,20 @@ export default function EventsPage() {
         </p>
       </div>
 
-      {/* Search & Category Filter Controls */}
+      {/* Improved Search Bar & Filter Controls */}
       <div
         style={{
           background: 'var(--panel)',
           border: '1px solid var(--panel-border)',
           borderRadius: 'var(--radius)',
-          padding: '20px',
-          marginBottom: '32px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          padding: '16px 20px',
+          marginBottom: '28px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Search form */}
-          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Main Search Input Form */}
+          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <Search
                 size={18}
@@ -90,9 +117,16 @@ export default function EventsPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by event title, description, or artist..."
-                className="input-field"
-                style={{ width: '100%', paddingLeft: '42px', paddingRight: searchQuery ? '36px' : '14px' }}
+                placeholder="Search by event title, artist, or venue..."
+                className="input"
+                style={{
+                  width: '100%',
+                  paddingLeft: '42px',
+                  paddingRight: searchQuery ? '38px' : '14px',
+                  fontSize: '14px',
+                  height: '42px',
+                  borderRadius: 'var(--radius-sm)',
+                }}
               />
               {searchQuery && (
                 <button
@@ -109,32 +143,47 @@ export default function EventsPage() {
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
+                    padding: '4px',
                   }}
                   title="Clear search"
+                  aria-label="Clear search input"
                 >
                   <X size={16} />
                 </button>
               )}
             </div>
-            <button type="submit" className="btn btn-primary" style={{ padding: '0 20px', whiteSpace: 'nowrap' }}>
-              Search
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{
+                height: '42px',
+                padding: '0 22px',
+                whiteSpace: 'nowrap',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Search size={15} />
+              <span>Search</span>
             </button>
           </form>
 
-          {/* Category Chips */}
+          {/* Category Chips Bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '12.5px', color: 'var(--text-dim)', marginRight: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Filter size={14} /> Filter:
+              <Filter size={13} /> Genre:
             </span>
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
+                onClick={() => handleCategorySelect(cat)}
                 style={{
                   fontSize: '13px',
-                  padding: '6px 14px',
+                  padding: '5px 14px',
                   borderRadius: '20px',
                   cursor: 'pointer',
                   border: selectedCategory === cat ? '1px solid var(--primary)' : '1px solid var(--panel-border)',
@@ -147,6 +196,28 @@ export default function EventsPage() {
                 {cat}
               </button>
             ))}
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetAllFilters}
+                style={{
+                  marginLeft: 'auto',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--primary)',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <X size={13} />
+                <span>Reset Filters</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -154,10 +225,11 @@ export default function EventsPage() {
       {/* Events Results Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)' }}>
-          {selectedCategory === 'All' ? 'All Upcoming Events' : `${selectedCategory} Events`}
+          {selectedCategory === 'All' ? 'All Events' : `${selectedCategory} Events`}
+          {searchQuery && <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}> matching &ldquo;{searchQuery}&rdquo;</span>}
         </h2>
         <span style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
-          {loading ? 'Searching events...' : `${events.length} ${events.length === 1 ? 'event' : 'events'} available`}
+          {loading ? 'Loading...' : `${events.length} ${events.length === 1 ? 'event' : 'events'}`}
         </span>
       </div>
 
@@ -198,21 +270,32 @@ export default function EventsPage() {
             borderRadius: 'var(--radius)',
           }}
         >
-          <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎫</div>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'var(--bg-subtle)',
+              color: 'var(--text-dim)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}
+          >
+            <SearchX size={24} />
+          </div>
           <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px' }}>
             No events found
           </h3>
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '400px', margin: '0 auto 20px' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 20px', lineHeight: '1.5' }}>
             {searchQuery
-              ? `We couldn't find any events matching "${searchQuery}". Try a different keyword or category.`
-              : `There are currently no events listed under the "${selectedCategory}" category.`}
+              ? `We couldn't find any events matching "${searchQuery}". Try searching for another artist or venue.`
+              : `There are currently no events listed under "${selectedCategory}". Check back soon or browse all categories.`}
           </p>
-          {(searchQuery || selectedCategory !== 'All') && (
+          {hasActiveFilters && (
             <button
-              onClick={() => {
-                setSelectedCategory('All');
-                clearSearch();
-              }}
+              onClick={resetAllFilters}
               className="btn btn-secondary"
             >
               Reset Filters
@@ -233,7 +316,6 @@ export default function EventsPage() {
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                transition: 'border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease',
               }}
             >
               <div>

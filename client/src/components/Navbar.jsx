@@ -5,10 +5,12 @@ import { useTheme } from '../context/ThemeContext';
 import { Sun, Moon, Ticket } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, isAuthenticated, isOrganizer, isAdmin, logout } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const role = user?.role?.toUpperCase();
 
   const handleLogout = () => {
     logout();
@@ -81,7 +83,7 @@ export default function Navbar() {
             Events
           </Link>
 
-          {/* Links for Guest (Unauthenticated) */}
+          {/* Links for Guest (Unauthenticated: Events | How It Works | For Organizers) */}
           {!isAuthenticated && (
             <>
               <a
@@ -113,85 +115,44 @@ export default function Navbar() {
             </>
           )}
 
-          {/* Links for Regular Attendee (USER role) */}
-          {isAuthenticated && !isOrganizer && !isAdmin && (
+          {/* Links for Authenticated Users (Mutually exclusive: 3 links per role) */}
+          {isAuthenticated && (
             <>
-              <Link
-                to="/my-bookings"
-                style={{
-                  fontSize: '13.5px',
-                  color: isActive('/my-bookings') ? 'var(--primary)' : 'var(--text-muted)',
-                  fontWeight: isActive('/my-bookings') ? 600 : 500,
-                  textDecoration: 'none',
-                  transition: 'color 0.15s ease',
-                }}
-                className="nav-link"
-              >
-                My Bookings
-              </Link>
-              <a
-                href="/#how-it-works"
-                style={{
-                  fontSize: '13.5px',
-                  color: 'var(--text-muted)',
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  transition: 'color 0.15s ease',
-                }}
-                className="nav-link"
-              >
-                How It Works
-              </a>
-            </>
-          )}
+              {/* Admin: Events | Admin Panel | My Bookings */}
+              {role === 'ADMIN' && (
+                <Link
+                  to="/admin"
+                  style={{
+                    fontSize: '13.5px',
+                    color: isActive('/admin') ? 'var(--primary)' : 'var(--text-muted)',
+                    fontWeight: isActive('/admin') ? 600 : 500,
+                    textDecoration: 'none',
+                    transition: 'color 0.15s ease',
+                  }}
+                  className="nav-link"
+                >
+                  Admin Panel
+                </Link>
+              )}
 
-          {/* Links for Organizer (ORGANIZER role) */}
-          {isAuthenticated && isOrganizer && (
-            <>
-              <Link
-                to="/organizer/create"
-                style={{
-                  fontSize: '13.5px',
-                  color: isActive('/organizer/create') ? 'var(--primary)' : 'var(--text-muted)',
-                  fontWeight: isActive('/organizer/create') ? 600 : 500,
-                  textDecoration: 'none',
-                  transition: 'color 0.15s ease',
-                }}
-                className="nav-link"
-              >
-                Create Event
-              </Link>
-              <Link
-                to="/my-bookings"
-                style={{
-                  fontSize: '13.5px',
-                  color: isActive('/my-bookings') ? 'var(--primary)' : 'var(--text-muted)',
-                  fontWeight: isActive('/my-bookings') ? 600 : 500,
-                  textDecoration: 'none',
-                  transition: 'color 0.15s ease',
-                }}
-                className="nav-link"
-              >
-                My Bookings
-              </Link>
-            </>
-          )}
+              {/* Organizer: Events | Create Event | My Bookings */}
+              {role === 'ORGANIZER' && (
+                <Link
+                  to="/organizer/create"
+                  style={{
+                    fontSize: '13.5px',
+                    color: isActive('/organizer/create') ? 'var(--primary)' : 'var(--text-muted)',
+                    fontWeight: isActive('/organizer/create') ? 600 : 500,
+                    textDecoration: 'none',
+                    transition: 'color 0.15s ease',
+                  }}
+                  className="nav-link"
+                >
+                  Create Event
+                </Link>
+              )}
 
-          {/* Links for Admin (ADMIN role) */}
-          {isAuthenticated && isAdmin && (
-            <>
-              <Link
-                to="/admin"
-                style={{
-                  fontSize: '13.5px',
-                  color: isActive('/admin') ? 'var(--primary)' : 'var(--primary)',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  transition: 'color 0.15s ease',
-                }}
-              >
-                Admin Panel
-              </Link>
+              {/* My Bookings link (Always present for authenticated accounts) */}
               <Link
                 to="/my-bookings"
                 style={{
@@ -205,6 +166,23 @@ export default function Navbar() {
               >
                 My Bookings
               </Link>
+
+              {/* Regular Attendee: Events | My Bookings | How It Works */}
+              {role !== 'ADMIN' && role !== 'ORGANIZER' && (
+                <a
+                  href="/#how-it-works"
+                  style={{
+                    fontSize: '13.5px',
+                    color: 'var(--text-muted)',
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    transition: 'color 0.15s ease',
+                  }}
+                  className="nav-link"
+                >
+                  How It Works
+                </a>
+              )}
             </>
           )}
         </nav>
@@ -233,7 +211,10 @@ export default function Navbar() {
                 }}
               >
                 <span style={{ fontSize: '13px', fontWeight: 500 }}>{user?.name}</span>
-                <span className="badge badge-muted" style={{ fontSize: '9px', padding: '1px 5px' }}>
+                <span
+                  className={`badge ${role === 'ADMIN' ? 'badge-primary' : role === 'ORGANIZER' ? 'badge-warning' : 'badge-muted'}`}
+                  style={{ fontSize: '9px', padding: '1px 5px', fontWeight: 600 }}
+                >
                   {user?.role}
                 </span>
               </div>
