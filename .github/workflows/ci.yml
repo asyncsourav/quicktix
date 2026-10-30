@@ -31,3 +31,15 @@ jobs:
       - name: Run Maven test
         run: ./mvnw clean test
         working-directory: server
+
+      - name: Print Surefire reports on failure
+        if: failure()
+        run: |
+          for f in server/target/surefire-reports/*.txt; do
+            if [ -f "$f" ]; then
+              echo "=========================================="
+              echo "Report: $f"
+              echo "=========================================="
+              cat "$f"
+            fi
+          done
