@@ -11,6 +11,7 @@ import com.asyncsourav.quicktix.dto.response.UserResponse;
 import com.asyncsourav.quicktix.entity.Role;
 import com.asyncsourav.quicktix.exception.GlobalExceptionHandler;
 import com.asyncsourav.quicktix.service.AuthService;
+import com.asyncsourav.quicktix.service.RateLimiterService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.Cookie;
@@ -41,6 +42,9 @@ class AuthControllerTest {
 
     @Mock
     private AuthService authService;
+
+    @Mock
+    private RateLimiterService rateLimiterService;
 
     @InjectMocks
     private AuthController authController;
