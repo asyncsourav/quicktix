@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
+import EventsPage from './pages/EventsPage';
 import EventDetailPage from './pages/EventDetailPage';
 import MyBookingsPage from './pages/MyBookingsPage';
 import LoginPage from './pages/LoginPage';

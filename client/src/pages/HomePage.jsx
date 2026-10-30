@@ -1,407 +1,392 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../api/client';
 import {
-  Search,
   Calendar,
   MapPin,
   ArrowRight,
   ShieldCheck,
   Zap,
-  Lock,
-  Layers,
+  Ticket,
+  Users,
   CheckCircle2,
-  Database,
-  Cpu,
-  Radio,
+  Sparkles,
 } from 'lucide-react';
 
-const CATEGORIES = ['All', 'Concert', 'Sports', 'Theater', 'Conference', 'Comedy'];
-
 export default function HomePage() {
-  const [events, setEvents] = useState([]);
+  const { user, isAuthenticated, isOrganizer, isAdmin } = useAuth();
+  const [featuredEvents, setFeaturedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetchEvents();
-  }, [selectedCategory]);
+    fetchFeaturedEvents();
+  }, []);
 
-  const fetchEvents = async () => {
-    setLoading(true);
+  const fetchFeaturedEvents = async () => {
     try {
-      const params = {};
-      if (selectedCategory !== 'All') params.category = selectedCategory;
-      if (searchQuery.trim()) params.search = searchQuery.trim();
-
-      const res = await api.get('/events', { params });
-      setEvents(res.data || []);
+      const res = await api.get('/events');
+      // Show up to 3 upcoming events as featured on landing page
+      setFeaturedEvents((res.data || []).slice(0, 3));
     } catch (err) {
-      console.error('Failed to load events:', err);
+      console.error('Failed to load featured events:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchEvents();
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
-    <div className="container" style={{ paddingBottom: '40px' }}>
+    <div className="container" style={{ paddingTop: '24px', paddingBottom: '60px' }}>
+      {/* ====================================================================
+          Personalized Welcome Bar (Only visible when user is logged in)
+          ==================================================================== */}
+      {isAuthenticated && (
+        <div
+          style={{
+            background: 'var(--panel)',
+            border: '1px solid var(--panel-border)',
+            borderRadius: 'var(--radius)',
+            padding: '16px 20px',
+            marginBottom: '32px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: 'var(--primary-dim)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+              }}
+            >
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>
+                Welcome back, {user?.name}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Signed in as <span style={{ textTransform: 'capitalize' }}>{user?.role?.toLowerCase()}</span> ({user?.email})
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Link to="/events" className="btn btn-secondary btn-sm">
+              Browse Events
+            </Link>
+            {isOrganizer && (
+              <Link to="/organizer/create" className="btn btn-primary btn-sm">
+                Create Event
+              </Link>
+            )}
+            {isAdmin && (
+              <Link to="/admin" className="btn btn-primary btn-sm">
+                Admin Panel
+              </Link>
+            )}
+            {!isOrganizer && !isAdmin && (
+              <Link to="/my-bookings" className="btn btn-primary btn-sm">
+                My Bookings
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ====================================================================
           Hero Section
           ==================================================================== */}
-      <section className="hero-section" aria-labelledby="hero-heading">
-        <div className="hero-content">
-          <div className="hero-badge">
-            <span className="hero-pulse-dot" />
-            <span>High Concurrency • Transactional Integrity • Real-Time State</span>
-          </div>
-
-          <h1 id="hero-heading" className="hero-title">
-            Distributed Event Ticketing & <span className="gradient-text">Reservation System</span>
-          </h1>
-
-          <p className="hero-subtitle">
-            Engineered to eliminate race conditions and overselling during high-demand booking surges.
-            Powered by Spring Boot, PostgreSQL optimistic concurrency control, Redis distributed cache-aside,
-            and STOMP WebSocket seat synchronization.
-          </p>
-
-          <div className="hero-actions">
-            <a href="#events" className="btn-hero-primary" id="hero-cta-explore">
-              <span>Browse Events</span>
-              <ArrowRight size={15} />
-            </a>
-            <a href="#architecture" className="btn-hero-secondary" id="hero-cta-architecture">
-              <span>System Architecture</span>
-            </a>
-          </div>
-
-          {/* System Technical Specifications Grid */}
-          <div className="stats-grid" role="region" aria-label="System Architectural Highlights">
-            <div className="stat-card">
-              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
-                <ShieldCheck size={18} color="var(--primary)" />
-                <span className="stat-title">Optimistic Locking</span>
-              </div>
-              <div className="stat-desc">Hibernate @Version column ensures zero race collisions without database deadlocks.</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
-                <Zap size={18} color="var(--primary)" />
-                <span className="stat-title">Redis Cache-Aside</span>
-              </div>
-              <div className="stat-desc">In-memory caching for event catalog reads with automated @CacheEvict triggers.</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
-                <Radio size={18} color="var(--primary)" />
-                <span className="stat-title">Live WebSocket Sync</span>
-              </div>
-              <div className="stat-desc">STOMP broker broadcasts seat transitions (AVAILABLE, HELD, BOOKED) in real time.</div>
-            </div>
-
-            <div className="stat-card">
-              <div className="flex items-center gap-2" style={{ marginBottom: '8px' }}>
-                <Lock size={18} color="var(--primary)" />
-                <span className="stat-title">Rotating JWT Auth</span>
-              </div>
-              <div className="stat-desc">Stateless access tokens paired with rotating HttpOnly refresh tokens in PostgreSQL.</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ====================================================================
-          Architecture & Engineering Section
-          ==================================================================== */}
-      <section id="architecture" className="landing-section" aria-labelledby="arch-heading">
-        <div className="section-head">
-          <div className="section-tag">
-            <Layers size={13} />
-            <span>Core Architecture</span>
-          </div>
-          <h2 id="arch-heading" className="section-title">
-            Engineered for Concurrency & Consistency
-          </h2>
-          <p className="section-desc">
-            High-volume ticket sales create severe read and write contention. QuickTix addresses this with
-            explicit database versioning, in-memory catalog caching, and pub/sub seat state broadcasting.
-          </p>
+      <section
+        style={{
+          padding: '48px 0 40px',
+          textAlign: 'center',
+          maxWidth: '780px',
+          margin: '0 auto',
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'var(--primary-dim)',
+            color: 'var(--primary)',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            marginBottom: '18px',
+          }}
+        >
+          <Sparkles size={14} />
+          <span>Real-Time Seat Booking Platform</span>
         </div>
 
-        <div className="arch-grid">
-          <div className="arch-card">
-            <div>
-              <div className="arch-icon-wrap">
-                <ShieldCheck size={20} />
-              </div>
-              <h3 className="arch-title">Optimistic Concurrency Control</h3>
-              <p className="arch-text">
-                Every Seat entity maintains an explicit version number. During checkout, Hibernate validates that
-                the seat's version has not changed. If concurrent requests target the same seat, exactly one transaction
-                commits while conflicting requests fail gracefully with an ObjectOptimisticLockingFailureException.
-              </p>
-            </div>
-            <div className="arch-pill">
-              <Database size={12} />
-              <span>PostgreSQL • @Version Locking</span>
-            </div>
-          </div>
+        <h1
+          style={{
+            fontSize: 'clamp(32px, 5vw, 48px)',
+            fontWeight: 800,
+            letterSpacing: '-1px',
+            lineHeight: 1.15,
+            color: 'var(--text-main)',
+            marginBottom: '18px',
+          }}
+        >
+          Experience live events with <span style={{ color: 'var(--primary)' }}>real-time seat selection</span>
+        </h1>
 
-          <div className="arch-card">
-            <div>
-              <div className="arch-icon-wrap">
-                <Zap size={20} />
-              </div>
-              <h3 className="arch-title">Distributed Cache-Aside Strategy</h3>
-              <p className="arch-text">
-                Event catalog queries are served directly from an in-memory Redis cluster with a 5-minute safety TTL.
-                Whenever an organizer creates, updates, or deletes an event, Spring executes selective @CacheEvict
-                rules to guarantee data freshness across replicas without serving stale data.
-              </p>
-            </div>
-            <div className="arch-pill">
-              <Zap size={12} />
-              <span>Redis 7 • Spring Cache</span>
-            </div>
-          </div>
+        <p
+          style={{
+            fontSize: '16px',
+            lineHeight: 1.6,
+            color: 'var(--text-muted)',
+            marginBottom: '32px',
+            maxWidth: '640px',
+            marginLeft: 'auto',
+            marginRight: 'auto',
+          }}
+        >
+          Pick your exact seats on interactive venue maps. Zero double-booking, live availability updates across all viewers, and instant digital ticket confirmation.
+        </p>
 
-          <div className="arch-card">
-            <div>
-              <div className="arch-icon-wrap">
-                <Lock size={20} />
-              </div>
-              <h3 className="arch-title">Secure Dual-Token Authentication</h3>
-              <p className="arch-text">
-                Short-lived JWT access tokens reside strictly in frontend JavaScript memory to protect against XSS.
-                Refresh tokens are delivered via secure HttpOnly cookies and tracked in PostgreSQL with session
-                family identification and automatic invalidation upon reuse detection.
-              </p>
-            </div>
-            <div className="arch-pill">
-              <Lock size={12} />
-              <span>HttpOnly Cookies • Family Rotation</span>
-            </div>
-          </div>
-
-          <div className="arch-card">
-            <div>
-              <div className="arch-icon-wrap">
-                <Radio size={20} />
-              </div>
-              <h3 className="arch-title">STOMP WebSocket Seat Broadcasting</h3>
-              <p className="arch-text">
-                When a seat changes status during booking or cancellation, the service publishes a lightweight payload
-                to /topic/event.{'{id}'}. Connected clients update their local seat map immediately, eliminating
-                unnecessary polling and preventing stale selections.
-              </p>
-            </div>
-            <div className="arch-pill">
-              <Cpu size={12} />
-              <span>Spring WebSocket • STOMP Protocol</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ====================================================================
-          Concurrency Flow Section
-          ==================================================================== */}
-      <section id="concurrency-flow" className="landing-section" aria-labelledby="flow-heading">
-        <div className="section-head">
-          <div className="section-tag">
-            <CheckCircle2 size={13} />
-            <span>Transaction Lifecycle</span>
-          </div>
-          <h2 id="flow-heading" className="section-title">
-            Booking Concurrency Execution Flow
-          </h2>
-          <p className="section-desc">
-            How a seat reservation progresses through database transaction boundaries and conflict detection.
-          </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '40px' }}>
+          <Link
+            to="/events"
+            className="btn btn-primary"
+            style={{ padding: '12px 24px', fontSize: '15px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            <span>Explore All Events</span>
+            <ArrowRight size={16} />
+          </Link>
+          {!isAuthenticated ? (
+            <Link
+              to="/register"
+              className="btn btn-secondary"
+              style={{ padding: '12px 24px', fontSize: '15px', textDecoration: 'none' }}
+            >
+              Create Account
+            </Link>
+          ) : (
+            <Link
+              to="/my-bookings"
+              className="btn btn-secondary"
+              style={{ padding: '12px 24px', fontSize: '15px', textDecoration: 'none' }}
+            >
+              View My Bookings
+            </Link>
+          )}
         </div>
 
-        <div className="step-grid">
-          <div className="step-card">
-            <div className="step-num">01</div>
-            <h3 className="step-title">Seat Selection & Payload Submission</h3>
-            <p className="step-desc">
-              The attendee selects available seats on the interactive venue grid. The client dispatches a validated
-              payload containing event and seat identifiers to the booking service endpoint.
+        {/* 3 Core Highlights */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px',
+            textAlign: 'left',
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--panel-border)',
+              borderRadius: 'var(--radius)',
+              padding: '18px 20px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--primary)', fontWeight: 600, fontSize: '14px' }}>
+              <Zap size={18} />
+              <span>Live Seat Sync</span>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>
+              Seats change color and status in real-time on your screen as others browse and book.
             </p>
           </div>
 
-          <div className="step-card">
-            <div className="step-num">02</div>
-            <h3 className="step-title">Transactional Boundary & Version Check</h3>
-            <p className="step-desc">
-              Within a @Transactional boundary, the backend validates seat availability and applies status changes.
-              PostgreSQL executes atomic conditional updates matching the current version column.
+          <div
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--panel-border)',
+              borderRadius: 'var(--radius)',
+              padding: '18px 20px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--primary)', fontWeight: 600, fontSize: '14px' }}>
+              <ShieldCheck size={18} />
+              <span>Zero Double-Booking</span>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>
+              Concurrency-safe transactions ensure a seat can never be purchased twice by racing buyers.
             </p>
           </div>
 
-          <div className="step-card">
-            <div className="step-num">03</div>
-            <h3 className="step-title">Commit, Broadcast & Async Dispatch</h3>
-            <p className="step-desc">
-              On commit, version numbers increment atomically. The STOMP broker immediately broadcasts updated seat
-              statuses to all active clients, and an asynchronous confirmation is dispatched.
+          <div
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--panel-border)',
+              borderRadius: 'var(--radius)',
+              padding: '18px 20px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--primary)', fontWeight: 600, fontSize: '14px' }}>
+              <Ticket size={18} />
+              <span>Instant Confirmation</span>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5', margin: 0 }}>
+              Confirmed reservations are immediately accessible in your account and dispatched via email.
             </p>
           </div>
         </div>
       </section>
 
       {/* ====================================================================
-          Live Event Catalog Section
+          Featured Events Preview
           ==================================================================== */}
-      <section id="events" className="landing-section" aria-labelledby="events-heading">
-        <div className="section-head">
-          <div className="section-tag">
-            <Calendar size={13} />
-            <span>Event Catalog</span>
+      <section style={{ marginTop: '48px', marginBottom: '64px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px' }}>
+          <div>
+            <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.3px', marginBottom: '4px' }}>
+              Featured Events
+            </h2>
+            <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+              Upcoming highlights ready for instant seat selection
+            </p>
           </div>
-          <h2 id="events-heading" className="section-title">
-            Available Events
-          </h2>
-          <p className="section-desc">
-            Select an event to inspect venue layouts and reserve seats with live availability synchronization.
-          </p>
+          <Link
+            to="/events"
+            style={{
+              fontSize: '13.5px',
+              fontWeight: 600,
+              color: 'var(--primary)',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>View all events</span>
+            <ArrowRight size={14} />
+          </Link>
         </div>
 
-        {/* Search & Filter Toolbar */}
-        <div className="catalog-search-wrap">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
-                <Search
-                  size={15}
-                  style={{
-                    position: 'absolute',
-                    left: '14px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-dim)',
-                  }}
-                />
-                <input
-                  id="event-search-input"
-                  type="text"
-                  className="input"
-                  placeholder="Search events by artist, title, venue, or keyword..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ paddingLeft: '38px', height: '40px' }}
-                />
-              </div>
-              <button type="submit" className="btn btn-primary" id="event-search-btn" style={{ height: '40px', padding: '0 18px' }}>
-                <Search size={14} />
-                <span>Search</span>
-              </button>
-            </form>
-
-            {/* Category Chips */}
-            <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: '12px' }}>
-              <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className="btn btn-sm"
-                    style={{
-                      background: selectedCategory === cat ? 'var(--primary)' : 'var(--bg-subtle)',
-                      color: selectedCategory === cat ? '#ffffff' : 'var(--text-muted)',
-                      borderColor: selectedCategory === cat ? 'var(--primary)' : 'var(--panel-border)',
-                      fontWeight: selectedCategory === cat ? 600 : 500,
-                      padding: '5px 12px',
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                {events.length} event{events.length === 1 ? '' : 's'} loaded
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Events Grid */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontSize: '13.5px' }}>
-              <span className="hero-pulse-dot" />
-              <span>Loading event catalog...</span>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  background: 'var(--panel)',
+                  border: '1px solid var(--panel-border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '24px',
+                  minHeight: '200px',
+                  opacity: 0.6,
+                }}
+              />
+            ))}
           </div>
-        ) : events.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '48px 20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>No events found</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', maxWidth: '420px', margin: '0 auto' }}>
-              Try adjusting your search keyword or switching category filters to view other events.
-            </p>
+        ) : featuredEvents.length === 0 ? (
+          <div
+            style={{
+              background: 'var(--panel)',
+              border: '1px solid var(--panel-border)',
+              borderRadius: 'var(--radius)',
+              padding: '40px 20px',
+              textAlign: 'center',
+            }}
+          >
+            <p style={{ color: 'var(--text-muted)', marginBottom: '16px' }}>No upcoming events scheduled at the moment.</p>
+            <Link to="/events" className="btn btn-secondary btn-sm">Explore Event Catalog</Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {events.map((event) => (
-              <div key={event.id} className="event-card">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+            {featuredEvents.map((event) => (
+              <div
+                key={event.id}
+                className="event-card"
+                style={{
+                  background: 'var(--panel)',
+                  border: '1px solid var(--panel-border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                }}
+              >
                 <div>
-                  <div className="flex items-center justify-between gap-2" style={{ marginBottom: '12px' }}>
-                    <span className="badge badge-primary">{event.category}</span>
-                    <span style={{ fontSize: '16px', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--text-main)' }}>
-                      ${Number(event.basePrice).toFixed(2)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <span className="badge badge-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {event.category || 'Event'}
+                    </span>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary)' }}>
+                      From ${Number(event.basePrice || 0).toFixed(2)}
                     </span>
                   </div>
 
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', lineHeight: '1.3' }}>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px' }}>
                     {event.title}
                   </h3>
 
-                  {event.description && (
-                    <p
-                      style={{
-                        color: 'var(--text-muted)',
-                        fontSize: '13px',
-                        lineHeight: '1.5',
-                        marginBottom: '16px',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {event.description}
-                    </p>
-                  )}
+                  <p
+                    style={{
+                      fontSize: '13px',
+                      color: 'var(--text-muted)',
+                      lineHeight: '1.5',
+                      marginBottom: '16px',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {event.description}
+                  </p>
 
-                  <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <div className="flex items-center gap-2">
-                      <MapPin size={14} color="var(--text-dim)" style={{ flexShrink: 0 }} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {event.venueName} · {event.venueAddress}
-                      </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <Calendar size={14} color="var(--primary)" />
+                      <span>{formatDateTime(event.startTime)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} color="var(--text-dim)" style={{ flexShrink: 0 }} />
-                      <span>{new Date(event.startTime).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      <MapPin size={14} color="var(--primary)" />
+                      <span>{event.venueName || event.venue?.name || 'Main Stage'}</span>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--panel-border)' }}>
-                  <Link to={`/events/${event.id}`} className="event-action-btn">
-                    <span>Select Seats</span>
-                    <ArrowRight size={14} />
-                  </Link>
-                </div>
+                <Link
+                  to={`/events/${event.id}`}
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <span>Pick Seats & Book</span>
+                  <ArrowRight size={14} />
+                </Link>
               </div>
             ))}
           </div>
@@ -409,48 +394,170 @@ export default function HomePage() {
       </section>
 
       {/* ====================================================================
-          Interview & Demo Reference Card
+          How It Works Section
           ==================================================================== */}
-      <section className="landing-cta" aria-labelledby="cta-heading">
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: '680px', margin: '0 auto' }}>
-          <div className="section-tag" style={{ marginBottom: '14px' }}>
-            <ShieldCheck size={13} />
-            <span>Demonstration & Evaluation Reference</span>
-          </div>
-          <h2 id="cta-heading" style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 700, letterSpacing: '-0.5px', marginBottom: '12px', lineHeight: '1.25' }}>
-            Pre-Configured Test Accounts
+      <section
+        id="how-it-works"
+        style={{
+          background: 'var(--panel)',
+          border: '1px solid var(--panel-border)',
+          borderRadius: 'var(--radius)',
+          padding: '40px 32px',
+          marginBottom: '64px',
+        }}
+      >
+        <div style={{ textAlign: 'center', maxWidth: '580px', margin: '0 auto 36px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>
+            How QuickTix Works
           </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
-            The database is initialized with three distinct roles to test and demonstrate end-to-end functionality,
-            optimistic lock conflict resolution, and venue management:
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
+            Transparent, fast, and reliable ticketing from start to finish.
           </p>
+        </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '24px', textAlign: 'left' }}>
-            <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '14px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}>Attendee</div>
-              <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginBottom: '6px' }}>user@quicktix.com</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Browse events, book seats, test concurrency collisions, and view personal bookings.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '24px' }}>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'var(--primary-dim)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+                flexShrink: 0,
+              }}
+            >
+              1
             </div>
-
-            <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '14px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}>Organizer</div>
-              <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginBottom: '6px' }}>organizer@quicktix.com</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Create venues, publish events, and auto-generate configurable seat layouts.</div>
-            </div>
-
-            <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 'var(--radius-sm)', padding: '14px' }}>
-              <div style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}>Administrator</div>
-              <div style={{ fontSize: '11.5px', fontFamily: 'var(--font-mono)', color: 'var(--primary)', marginBottom: '6px' }}>admin@quicktix.com</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Access platform audit metrics, gross revenue stats, user registry, and all bookings.</div>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
+                Browse & Filter Events
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Explore concerts, theater, conferences, and sports matches. Filter by genre or search by your favorite performer.
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-3" style={{ flexWrap: 'wrap' }}>
-            <Link to="/login" className="btn-hero-primary" style={{ padding: '10px 20px', fontSize: '13.5px' }}>
-              <span>Sign In with Demo Account</span>
-              <ArrowRight size={14} />
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'var(--primary-dim)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+                flexShrink: 0,
+              }}
+            >
+              2
+            </div>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
+                Pick Your Exact Seat
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Open the live interactive seat map. Check rows, seat labels, and live pricing. Available seats update continuously.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: 'var(--primary-dim)',
+                color: 'var(--primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: '14px',
+                flexShrink: 0,
+              }}
+            >
+              3
+            </div>
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>
+                Instant Booking Guarantee
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Confirm your booking in one click. Your seat is locked, immune to race conditions, and saved to your account.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====================================================================
+          Organizer Section
+          ==================================================================== */}
+      <section
+        id="organizers"
+        style={{
+          background: 'linear-gradient(135deg, var(--panel) 0%, var(--bg-subtle) 100%)',
+          border: '1px solid var(--panel-border)',
+          borderRadius: 'var(--radius)',
+          padding: '40px 32px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '24px',
+        }}
+      >
+        <div style={{ maxWidth: '540px' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              color: 'var(--primary)',
+              fontSize: '12px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.8px',
+              marginBottom: '10px',
+            }}
+          >
+            <Users size={14} />
+            <span>For Event Creators</span>
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-main)', marginBottom: '10px' }}>
+            Host your next event with QuickTix
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+            Venue management made simple. Register venues, generate seating charts automatically based on capacity, configure ticket pricing tiers, and monitor real-time ticket sales.
+          </p>
+        </div>
+
+        <div>
+          {isOrganizer ? (
+            <Link to="/organizer/create" className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '14px', textDecoration: 'none' }}>
+              Create an Event Now
             </Link>
-          </div>
+          ) : !isAuthenticated ? (
+            <Link to="/register" className="btn btn-primary" style={{ padding: '12px 24px', fontSize: '14px', textDecoration: 'none' }}>
+              Sign Up as Organizer
+            </Link>
+          ) : (
+            <Link to="/events" className="btn btn-secondary" style={{ padding: '12px 24px', fontSize: '14px', textDecoration: 'none' }}>
+              Explore Events
+            </Link>
+          )}
         </div>
       </section>
     </div>
