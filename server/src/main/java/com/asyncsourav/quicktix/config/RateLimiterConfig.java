@@ -8,6 +8,9 @@ import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.SocketOptions;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,8 +30,8 @@ public class RateLimiterConfig {
     private int redisPort;
 
    
-    // With 200ms timeouts, the rate limiter detects the issue almost instantly, logs the warning, and fails open (allow the request to proceed)
-    @Value("${spring.data.redis.timeout:200ms}")
+    // With 150ms timeouts, the rate limiter detects the issue quickly and falls back to the local limiter
+    @Value("${spring.data.redis.timeout:150ms}")
     private Duration redisTimeout;
 
 
@@ -49,5 +52,12 @@ public class RateLimiterConfig {
                 .autoReconnect(true)
                 .build());
         return client;
+    }
+
+
+    @Bean
+    @ConditionalOnMissingBean
+    public MeterRegistry meterRegistry() {
+        return new SimpleMeterRegistry();
     }
 }
