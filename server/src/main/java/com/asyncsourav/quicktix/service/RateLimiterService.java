@@ -97,7 +97,9 @@ public class RateLimiterService {
 
             Bucket bucket = pm.builder().build(key, () -> config);
             probe = bucket.tryConsumeAndReturnRemaining(1);
-        } catch (Exception e) {
+        } 
+        // if theredis is down, Rate limiter is unavailabe then and hence it fall open
+        catch (Exception e) {
             log.warn("Rate limiter unavailable, failing open: {}", e.toString());
             return true;
         }
