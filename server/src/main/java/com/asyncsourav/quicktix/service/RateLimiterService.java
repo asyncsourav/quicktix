@@ -14,6 +14,8 @@ import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.redis.lettuce.Bucket4jLettuce;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.ByteArrayCodec;
@@ -35,6 +37,7 @@ public class RateLimiterService {
 
 
     private final RedisClient redisClient;
+    private final CircuitBreaker circuitBreaker;
     private volatile StatefulRedisConnection<String, byte[]> connection;
     private volatile ProxyManager<String> proxyManager;
 
@@ -55,6 +58,24 @@ public class RateLimiterService {
 
     public RateLimiterService(RedisClient rateLimitRedisClient) {
         this.redisClient = rateLimitRedisClient;
+
+        // Configure Resilience4j Circuit Breaker:
+        // If Redis fails 5 times, trip to OPEN and skip Redis for 15 seconds (zero latency wait).
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .slidingWindowSize(5)
+                .minimumNumberOfCalls(5)
+                .failureRateThreshold(50.0f)
+                .waitDurationInOpenState(Duration.ofSeconds(15))
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .ignoreExceptions(RateLimitExceededException.class)
+                .build();
+
+        this.circuitBreaker = CircuitBreaker.of("redisRateLimiter", config);
+    }
+
+
+    public CircuitBreaker getCircuitBreaker() {
+        return circuitBreaker;
     }
 
 
@@ -83,12 +104,20 @@ public class RateLimiterService {
 
 
     private boolean checkLimit(String key, Bandwidth limit) {
+
+        // If Circuit Breaker is OPEN (Redis is known to be down), skip immediately with zero wait!
+        if (!circuitBreaker.tryAcquirePermission()) {
+            log.warn("Redis Circuit Breaker is OPEN. Skipping rate limit check for key: {}", key);
+            return true;
+        }
+
+        long startTime = System.nanoTime();
         ConsumptionProbe probe;
+
         try {
             ProxyManager<String> pm = getProxyManager();
             if (pm == null) {
-                log.warn("Rate limiter proxy manager unavailable, failing open for key: {}", key);
-                return true;
+                throw new IllegalStateException("Redis proxy manager is unavailable");
             }
 
             BucketConfiguration config = BucketConfiguration.builder()
@@ -97,10 +126,19 @@ public class RateLimiterService {
 
             Bucket bucket = pm.builder().build(key, () -> config);
             probe = bucket.tryConsumeAndReturnRemaining(1);
+
+            // Record success in Circuit Breaker
+            circuitBreaker.onSuccess(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+
         } 
-        // if theredis is down, Rate limiter is unavailabe then and hence it fall open
+        catch (RateLimitExceededException e) {
+            // Legitimate rate limit hit by a bot/user: rethrow so HTTP 429 is returned
+            throw e;
+        } 
         catch (Exception e) {
-            log.warn("Rate limiter unavailable, failing open: {}", e.toString());
+            // Redis is down or timing out: record failure in Circuit Breaker and fail open
+            circuitBreaker.onError(System.nanoTime() - startTime, TimeUnit.NANOSECONDS, e);
+            log.warn("Rate limiter unavailable, failing open: {}", e.getMessage());
             return true;
         }
 
@@ -108,6 +146,7 @@ public class RateLimiterService {
             long wait = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
             throw new RateLimitExceededException(wait);
         }
+
         return true;
     }
 
@@ -123,20 +162,25 @@ public class RateLimiterService {
                 return proxyManager;
             }
 
-            try {
-                if (connection == null || !connection.isOpen()) {
-                    connection = redisClient.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
-                }
-                proxyManager = Bucket4jLettuce.casBasedBuilder(connection)
-                        .expirationAfterWrite(
-                                ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
-                        )
-                        .build();
-                return proxyManager;
-            } catch (Exception e) {
-                log.warn("Unable to establish Redis connection for rate limiting: {}", e.getMessage());
+            if (redisClient == null) {
                 return null;
             }
+
+            if (connection == null || !connection.isOpen()) {
+                connection = redisClient.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
+            }
+
+            if (connection == null) {
+                return null;
+            }
+
+            proxyManager = Bucket4jLettuce.casBasedBuilder(connection)
+                    .expirationAfterWrite(
+                            ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
+                    )
+                    .build();
+
+            return proxyManager;
         }
     }
 }
