@@ -23,8 +23,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      timeout: ${REDIS_TIMEOUT:150ms}
-      connect-timeout: ${REDIS_CONNECT_TIMEOUT:150ms}
+      timeout: ${REDIS_TIMEOUT:2000ms}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2000ms}
 
   devtools:
     restart:

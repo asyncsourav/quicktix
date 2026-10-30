@@ -4,20 +4,20 @@ package com.asyncsourav.quicktix.service;
 
 
 
-
-import com.asyncsourav.quicktix.exception.RateLimitExceededException;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Refill;
 import io.lettuce.core.RedisClient;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 
 
@@ -31,81 +31,35 @@ class RateLimiterServiceTest {
 
 
 
-
     @Test
-    @DisplayName("checkBookingRateLimit: When Redis is stopped, local fallback allows up to limit and blocks with 429")
-    void checkBookingRateLimit_WhenRedisStopped_UsesLocalFallbackUntilLimitThenThrows429() {
+    @DisplayName("checkBookingRateLimit: Fails open when Redis is unavailable")
+    void checkBookingRateLimit_WhenRedisIsUnavailable_ShouldNotThrow() {
 
-        // Given - Redis is stopped / unavailable, simple meter registry
-        SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        RateLimiterService service = new RateLimiterService(redisClient, registry);
-
-        String username = "fallback-user@quicktix.com";
-        String clientIp = "192.168.1.100";
-
-        // When - Make requests within local capacity (burst of 5 for user limit)
-        for (int i = 0; i < 5; i++) {
-            service.checkBookingRateLimit(username, clientIp);
-        }
-
-        // Then - The 6th request exceeds local limit and throws RateLimitExceededException (which maps to 429)
-        assertThatThrownBy(() -> service.checkBookingRateLimit(username, clientIp))
-                .isInstanceOf(RateLimitExceededException.class);
-
-        // Assert Micrometer fallback counter is incremented (> 0)
-        double count = service.getFallbackCounter().count();
-        assertThat(count).isGreaterThan(0.0);
-    }
-
-
-
-
-    @Test
-    @DisplayName("checkLoginRateLimit: When Redis is stopped, login limit allows up to limit and blocks with 429")
-    void checkLoginRateLimit_WhenRedisStopped_UsesLocalFallbackUntilLimitThenThrows429() {
-
-        // Given - Redis is stopped / unavailable
-        SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        RateLimiterService service = new RateLimiterService(redisClient, registry);
-
-        String clientIp = "192.168.1.101";
-        String email = "login-test@quicktix.com";
-
-        // When - Consume burst capacity of 5
-        for (int i = 0; i < 5; i++) {
-            service.checkLoginRateLimit(clientIp, email);
-        }
-
-        // Then - 6th request throws 429
-        assertThatThrownBy(() -> service.checkLoginRateLimit(clientIp, email))
-                .isInstanceOf(RateLimitExceededException.class);
-
-        // Counter is incremented
-        assertThat(service.getFallbackCounter().count()).isGreaterThan(0.0);
-    }
-
-
-
-
-    @Test
-    @DisplayName("CircuitBreaker: Opens after 5 failures and stays open")
-    void circuitBreaker_OpensAfterFailures() {
-
-        // Given - Redis fails
         RateLimiterService service = new RateLimiterService(redisClient);
 
-        // When - Trigger 5 failures
-        for (int i = 1; i <= 5; i++) {
-            try {
-                service.checkBookingRateLimit("cb-user" + i + "@quicktix.com", "10.0.0." + i);
-            } catch (Exception ignored) {
-            }
-        }
-
-        // Then - Circuit breaker transitions to OPEN
-        assertThat(service.getCircuitBreaker().getState()).isEqualTo(CircuitBreaker.State.OPEN);
+        assertThatCode(() -> service.checkBookingRateLimit("user@quicktix.com", "203.0.113.9"))
+                .doesNotThrowAnyException();
     }
 
+
+
+    @Test
+    @DisplayName("checkLimit: Returns true when proxy manager is unavailable")
+    void checkLimit_WhenProxyManagerIsNull_ShouldReturnTrue() throws Exception {
+
+        RateLimiterService service = new RateLimiterService(redisClient);
+
+        Method checkLimit = RateLimiterService.class.getDeclaredMethod("checkLimit", String.class, Bandwidth.class);
+        checkLimit.setAccessible(true);
+
+        boolean result = (boolean) checkLimit.invoke(
+                service,
+                "rate:booking:user:user@quicktix.com",
+                Bandwidth.classic(5, Refill.greedy(1, Duration.ofSeconds(1)))
+        );
+
+        assertThat(result).isTrue();
+    }
 
 
 

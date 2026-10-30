@@ -11,10 +11,8 @@ import com.asyncsourav.quicktix.dto.request.RegisterRequest;
 import com.asyncsourav.quicktix.dto.response.AuthResponse;
 import com.asyncsourav.quicktix.dto.response.UserResponse;
 import com.asyncsourav.quicktix.service.AuthService;
-import com.asyncsourav.quicktix.service.RateLimiterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +35,6 @@ public class AuthController {
 
 
     private final AuthService authService;
-    private final RateLimiterService rateLimiterService;
 
 
 
@@ -71,11 +68,7 @@ public class AuthController {
             @Valid 
             @RequestBody 
             LoginRequest request,
-            HttpServletRequest servletRequest,
             HttpServletResponse response) {
-
-        String clientIp = extractClientIp(servletRequest);
-        rateLimiterService.checkLoginRateLimit(clientIp, request.email());
 
         AuthResponse authResponse = authService.login(request);
 
@@ -89,23 +82,6 @@ public class AuthController {
 
         return ResponseEntity
                 .ok(ApiResponse.success("Login successful", authResponse));
-    }
-
-
-
-    private String extractClientIp(HttpServletRequest request) {
-        if (request == null) {
-            return "127.0.0.1";
-        }
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            return xForwardedFor.split(",")[0].trim();
-        }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
-        }
-        return request.getRemoteAddr() != null ? request.getRemoteAddr() : "127.0.0.1";
     }
 
 
