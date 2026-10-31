@@ -57,6 +57,8 @@ class EventCacheTest extends BaseIntegrationTest {
         }
         if (cacheManager.getCache("event") != null) {
             cacheManager.getCache("event").clear();
+            cacheManager.getCache("event").evict("1");
+            cacheManager.getCache("event").evict(1L);
         }
 
         User organizer = User.builder()
