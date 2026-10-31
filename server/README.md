@@ -2,8 +2,12 @@
 
 The core backend service powering QuickTix. Built with Java 25 and Spring Boot 4, it provides concurrent seat booking, distributed rate limiting, real-time WebSocket state propagation, and JWT authentication.
 
-- **Swagger UI:** http://localhost:8080/swagger-ui.html
-- **OpenAPI Schema:** http://localhost:8080/v3/api-docs
+- **Live Backend API:** https://quicktix-api.onrender.com
+- **Live Health Check:** https://quicktix-api.onrender.com/api/ping
+- **Live Swagger UI:** https://quicktix-api.onrender.com/swagger-ui.html
+- **Live OpenAPI Schema:** https://quicktix-api.onrender.com/v3/api-docs
+- **Local Swagger UI:** http://localhost:8080/swagger-ui.html (when running locally)
+- **Local OpenAPI Schema:** http://localhost:8080/v3/api-docs
 - **Parent Repository:** [../README.md](../README.md)
 - **Architecture Overview:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
 

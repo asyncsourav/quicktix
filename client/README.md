@@ -3,7 +3,9 @@
 The modern React frontend for QuickTix. Built with React 19 and Vite, it interfaces with the Spring Boot backend REST API and subscribes to STOMP WebSockets for real-time seat map synchronization.
 
 - **Production Deployment:** https://quicktix-weld.vercel.app/
-- **Backend API:** [../server/README.md](../server/README.md)
+- **Live Backend API:** https://quicktix-api.onrender.com
+- **Live Health Check:** https://quicktix-api.onrender.com/api/ping
+- **Backend Architecture & Documentation:** [../server/README.md](../server/README.md)
 - **Architecture Overview:** [../ARCHITECTURE.md](../ARCHITECTURE.md)
 
 ---

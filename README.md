@@ -5,7 +5,10 @@
 A full-stack, distributed ticket booking system engineered to prevent race conditions during high-volume ticket drops. It guarantees that seats cannot be double-booked using JPA optimistic locking, synchronizes seat maps in real time via STOMP WebSockets, and protects resources using distributed token-bucket rate limiting backed by Redis.
 
 - **Live Demo (Frontend):** https://quicktix-weld.vercel.app/
-- **API Documentation:** http://localhost:8080/swagger-ui.html (when running locally)
+- **Live Backend API:** https://quicktix-api.onrender.com
+- **Live Backend Health Check:** https://quicktix-api.onrender.com/api/ping
+- **Live Swagger API Documentation:** https://quicktix-api.onrender.com/swagger-ui.html
+- **Local Swagger (when running locally):** http://localhost:8080/swagger-ui.html
 - **Architecture Deep-Dive:** [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Complete File Directory:** [folder-structure.md](folder-structure.md)
 
