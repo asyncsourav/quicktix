@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -35,6 +36,22 @@ public class AuthController {
 
 
     private final AuthService authService;
+
+    @Value("${jwt.cookie-secure:false}")
+    private boolean cookieSecure;
+
+    @Value("${jwt.cookie-same-site:Lax}")
+    private String cookieSameSite;
+
+    private ResponseCookie buildRefreshCookie(String token, long maxAgeSeconds) {
+        return ResponseCookie.from("refreshToken", token)
+                .httpOnly(true)
+                .path("/api/auth")
+                .maxAge(maxAgeSeconds)
+                .secure(cookieSecure)
+                .sameSite(cookieSameSite)
+                .build();
+    }
 
 
 
@@ -72,12 +89,7 @@ public class AuthController {
 
         AuthResponse authResponse = authService.login(request);
 
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", authResponse.refreshToken())
-                .httpOnly(true)
-                .path("/api/auth")
-                .maxAge(7 * 24 * 60 * 60)
-                .sameSite("Lax")
-                .build();
+        ResponseCookie cookie = buildRefreshCookie(authResponse.refreshToken(), 7 * 24 * 60 * 60);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
         return ResponseEntity
@@ -107,12 +119,7 @@ public class AuthController {
 
         AuthResponse authResponse = authService.refresh(new RefreshTokenRequest(token));
 
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", authResponse.refreshToken())
-                .httpOnly(true)
-                .path("/api/auth")
-                .maxAge(7 * 24 * 60 * 60)
-                .sameSite("Lax")
-                .build();
+        ResponseCookie cookie = buildRefreshCookie(authResponse.refreshToken(), 7 * 24 * 60 * 60);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
         return ResponseEntity
@@ -140,12 +147,7 @@ public class AuthController {
             authService.logout(new RefreshTokenRequest(token));
         }
 
-        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
-                .httpOnly(true)
-                .path("/api/auth")
-                .maxAge(0)
-                .sameSite("Lax")
-                .build();
+        ResponseCookie cookie = buildRefreshCookie("", 0);
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
         return ResponseEntity

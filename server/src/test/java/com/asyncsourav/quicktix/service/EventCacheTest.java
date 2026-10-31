@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 
 
 
+@org.springframework.test.annotation.DirtiesContext
 class EventCacheTest extends BaseIntegrationTest {
 
 
@@ -50,6 +51,7 @@ class EventCacheTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        reset(eventRepository);
         if (cacheManager.getCache("events") != null) {
             cacheManager.getCache("events").clear();
         }

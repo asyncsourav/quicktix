@@ -29,6 +29,9 @@ public class RateLimiterConfig {
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
+    @Value("${spring.data.redis.ssl.enabled:false}")
+    private boolean redisSsl;
+
     // With 200ms timeouts, the rate limiter detects the issue almost instantly, logs the warning, and fails open (allow the request to proceed)
     @Value("${spring.data.redis.timeout:200ms}")
     private Duration redisTimeout;
@@ -41,6 +44,10 @@ public class RateLimiterConfig {
                 .withHost(redisHost)
                 .withPort(redisPort)
                 .withTimeout(redisTimeout);
+
+        if (redisSsl) {
+            uriBuilder.withSsl(true);
+        }
 
         if (redisPassword != null && !redisPassword.isBlank()) {
             uriBuilder.withPassword(redisPassword.toCharArray());
