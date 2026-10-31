@@ -18,11 +18,9 @@ spring:
       ddl-auto: update
     show-sql: ${SHOW_SQL:false}
     open-in-view: false
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: ${FORMAT_SQL:false}
-        dialect: org.hibernate.dialect.PostgreSQLDialect
       jdbc:
         time_zone: UTC
 
